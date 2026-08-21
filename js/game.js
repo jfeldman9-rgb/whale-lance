@@ -285,7 +285,7 @@
     root.style.position = "relative";
     const wrap = document.createElement("div");
     wrap.id = "tkd-video";
-    wrap.style.cssText = "position:absolute;left:0;top:0;width:100%;height:100%;background:#0b1020;z-index:8;display:flex;align-items:center;justify-content:center;";
+    wrap.style.cssText = "position:absolute;left:0;top:0;width:100%;height:100%;background:#0b1020;z-index:8;display:flex;align-items:center;justify-content:center;pointer-events:none;";
     const vid = document.createElement("video");
     vid.src = url;
     vid.muted = true;
@@ -515,7 +515,7 @@
       this.didTap = false;
       this.didKickEnemy = false;
       this.freeHitUsed = false;
-      this.invuln = 0;
+      this.invuln = SAFE_MS;
       this.gateWarned = false;
       this.gateWarnUntil = 0;
       this.shownPowerPrompt = false;
@@ -1269,10 +1269,16 @@
         .setDepth(39);
 
       this.drawOverCard(true);
-      this.overTimer = this.time.delayedCall(1600, () => this.showCredits());
+      this.overTimer = this.time.delayedCall(2400, () => this.showCredits());
       this.input.keyboard.on("keydown-SPACE", this.onSpace, this);
       this.input.keyboard.on("keydown-ENTER", this.onSpace, this);
-      this.input.on("pointerdown", this.onTap, this);
+      this.time.delayedCall(450, () => {
+        this.input.on("pointerdown", this.onTap, this);
+      });
+      this.events.once("shutdown", () => {
+        if (this.creditsOverlay && this.creditsOverlay.done) this.creditsOverlay.done();
+        sweepHtmlVideos();
+      });
     }
 
     drawOverCard(first) {
