@@ -19,3 +19,7 @@ html, body {
   display: block;
   margin: 0 auto;
 }
+
+#game video {
+  pointer-events: none;
+}
