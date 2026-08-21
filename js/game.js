@@ -142,6 +142,8 @@
       this.load.image("seagull", "assets/seagull.png");
       this.load.image("sign", "assets/sign.png");
       this.load.image("bg", "assets/bg.jpg");
+      this.load.image("bgFar", "assets/bg-far.jpg");
+      this.load.image("bgRail", "assets/bg-rail.png");
     }
     create() {
       this.scene.start("title");
@@ -266,8 +268,12 @@
       this.swipeStart = null;
       this.jetSfx = 0;
 
-      this.bg1 = this.add.image(0, H / 2, "bg").setOrigin(0, 0.5).setDisplaySize(W, H);
-      this.bg2 = this.add.image(W, H / 2, "bg").setOrigin(0, 0.5).setDisplaySize(W, H);
+      this.bgFar1 = this.add.image(0, H / 2, "bgFar").setOrigin(0, 0.5).setDisplaySize(W, H);
+      this.bgFar2 = this.add.image(W, H / 2, "bgFar").setOrigin(0, 0.5).setDisplaySize(W, H);
+      this.bg1 = this.add.image(0, H / 2, "bg").setOrigin(0, 0.5).setDisplaySize(W, H).setAlpha(0.92);
+      this.bg2 = this.add.image(W, H / 2, "bg").setOrigin(0, 0.5).setDisplaySize(W, H).setAlpha(0.92);
+      this.rail1 = this.add.image(0, H, "bgRail").setOrigin(0, 1).setDisplaySize(W, 168).setDepth(6);
+      this.rail2 = this.add.image(W, H, "bgRail").setOrigin(0, 1).setDisplaySize(W, 168).setDepth(6);
 
       this.foods = this.physics.add.group();
       this.hazards = this.physics.add.group();
@@ -420,13 +426,13 @@
       if (roll < 0.46) {
         const r = Math.random();
         const kind = r < 0.22 ? "spaghetti" : r < 0.42 ? "poi" : r < 0.62 ? "musubi" : r < 0.82 ? "pineapple" : "chocolate";
-        this.spawnItem(this.foods, kind, y, 0.42 + Math.random() * 0.12);
+        this.spawnItem(this.foods, kind, y, 0.58 + Math.random() * 0.1);
       } else if (roll < 0.58) {
         this.spawnItem(this.pickups, "stud", y, 0.38);
       } else if (roll < 0.72) {
-        this.spawnItem(this.doors, "door", Phaser.Math.Between(220, 500), 0.7);
+        this.spawnItem(this.doors, "door", Phaser.Math.Between(240, 500), 0.62);
       } else if (roll < 0.84) {
-        this.spawnItem(this.hazards, "gym", y, 0.5);
+        this.spawnItem(this.hazards, "gym", y, 0.62);
       } else if (roll < 0.93) {
         this.spawnItem(this.hazards, "seagull", Phaser.Math.Between(110, 260), 0.46);
       } else {
@@ -545,11 +551,22 @@
       this.distance += (this.scroll * dt) / 1000;
       this.score += dt * 0.02;
 
-      const bgSpeed = this.scroll * 0.35 * (dt / 1000);
-      this.bg1.x -= bgSpeed;
-      this.bg2.x -= bgSpeed;
-      if (this.bg1.x <= -W) this.bg1.x = this.bg2.x + W;
-      if (this.bg2.x <= -W) this.bg2.x = this.bg1.x + W;
+      const wrapPair = (a, b) => {
+        if (a.x <= -W) a.x = b.x + W;
+        if (b.x <= -W) b.x = a.x + W;
+      };
+      const far = this.scroll * 0.18 * (dt / 1000);
+      const mid = this.scroll * 0.34 * (dt / 1000);
+      const near = this.scroll * 0.92 * (dt / 1000);
+      this.bgFar1.x -= far;
+      this.bgFar2.x -= far;
+      this.bg1.x -= mid;
+      this.bg2.x -= mid;
+      this.rail1.x -= near;
+      this.rail2.x -= near;
+      wrapPair(this.bgFar1, this.bgFar2);
+      wrapPair(this.bg1, this.bg2);
+      wrapPair(this.rail1, this.rail2);
 
       this.applyLanceLook();
       this.sweep(this.foods);
