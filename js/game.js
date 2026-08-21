@@ -454,7 +454,8 @@
       item.destroy();
       this.inflate(spec.inflate);
       this.score += spec.score + (spec.bonus ? 20 : 0);
-      this.eatFlash = kind === "spaghetti" ? 420 : 220;
+      this.eatFlash = kind === "spaghetti" ? 720 : 520;
+      this.jetting = false;
       AudioKit.beep("eat");
       this.floatLabel(lance.x, lance.y - 70, spec.overfill ? "Chocolate fountain!" : spec.bonus ? "Fried spaghetti!" : "Yum");
     }
