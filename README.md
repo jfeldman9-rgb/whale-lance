@@ -1,38 +1,39 @@
-# Whale Lance
+# Tae Kwon Doe Riley
 
-Jason’s dad Lance is a cartoon whale on the Pride of America. He always swims forward. Tap to hop, eat the buffet, and skip the gym — and the frozen yogurt. Tone is warm dad-joke, never mean.
+Riley is a ninja. He always moves forward through a stone hall of the Wheel. Tap to kick, scatter the Trollocs, and gather the One Power. Tone is warm kid-hero, never mean.
 
-Play locally: open `index.html`, or serve the repo root (`npx serve .`). Landscape 16:9, touch + keyboard, no accounts.
+Modeled on the Whale Lance cruise loop: landscape 16:9, one-button, touch + keyboard, no accounts.
+
+Play locally: open `index.html`, or serve the repo root (`npx serve .`).
 
 ## Loop
 
-Title → play → GAME OVER → gym cutscene → RETRY / TITLE.
+Opening video → Title → play → GAME OVER → ending credits → RETRY / TITLE.
 
-- **Tap / Space:** hop (short toot + green puff). That is the only required control.
-- **Hold:** optional extra boost / jet (uses more buffet fuel)
-- **Swipe down / S or Down:** optional dive
-- Swim into food to eat it. Hitboxes are large; nearby plates drift toward Lance. Frozen yogurt does **not** magnet.
-- Fried spaghetti is the hero pickup. Chocolate overfills (funny squash) but is not a trap.
-- **Frozen yogurt is a trap.** It shrinks Lance, dumps **BUFFET FUEL**, and flashes “Lance hates frozen yogurt!” Two cups in one run, or one cup while already pancake-ish, ends the cruise.
-- **BUFFET FUEL** fills when you eat and shrinks when you hop. At 0 he goes pancake (`idle-deflated`). Stay empty for about 2.5 seconds and that’s a lose.
-- Too puffy at a cabin door? One warning flash — “Too full — toot to shrink!” — for about 1.5 seconds. The next door contact (or the same door if you are still stuck) ends the run. No permanent first-door pass.
-- Gym gear, seagulls, and the No Farting sign: one free “oof” per run. The second hazard hit is game over.
-- First-run overlays: TAP TO HOP, EAT THE BUFFET, AVOID THE GYM. After one tap and one bite they stay away (`localStorage`).
-- After GAME OVER, a short gym cutscene (`cutscene-gym.png`) plays. TAP / Space skips. Then RETRY / TITLE. Space retries from the menu.
+- **Tap / Space:** hop and kick. That is the only required control.
+- **Hold:** optional extra boost.
+- **Swipe down / S or Down:** optional dive kick.
+- Trollocs scroll in from the right the way plates did on the cruise. Kick them. A Trolloc that lands without a kick is a hit.
+- One free “oof” per run. The second hit ends the Pattern for now.
+- **Eye of the World:** pure saidin and saidar. Fills the One Power meter.
+- **Ter’angreal:** a random weave (air shield, slow time, fire kick, extra hop, or a second chance).
+- **Angreal:** faster, longer kicks.
+- Fill enough of the Power and a **Warder** appears and kicks with Riley.
+- Fill enough **saidin** and the next tap casts **lightning** at every enemy on screen.
+- First-run overlays: TAP TO KICK, KICK THE TROLLOCS, GRAB THE ONE POWER.
 - Best + last run saved in `localStorage`
 - Mute button (🔊)
+- TAP / Space skips the opening video and the credits.
 
-Lance auto-bobs and stays on screen. The body still reads as beach-ball full or towel-deflated. Jet uses `fart-blast.png`. Spaghetti uses `eat.png`. Title uses the v2 likeness (`title.png`).
+Riley auto-bobs and stays on screen. Kick uses `riley-kick.png`. Idle uses `riley-idle.png`.
 
 ## Art
 
-Videomaker v2 sprites (magenta `#FF00FF` is chroma-key, not part of the art):
+Magenta `#FF00FF` is chroma-key, not part of the art.
 
-- `art/sprites-v2/` — canonical character frames
-- `art/sprites/` — same frames plus pickups / hazards / background, including `froyo.png` and `cutscene-gym.png`
-- `assets/` — keyed, game-ready files the prototype loads
-
-The froyo cup is keyed at load (magenta is transparency). The lose still is shown full-bleed; do not replace it with a different trainer illustration.
+- `art/sprites-riley/` — source character and pickup frames
+- `art/cinematics/` — opening stills
+- `assets/` — keyed sprites, backgrounds, `intro.mp4`, `credits.mp4`
 
 ## GitHub Pages
 
