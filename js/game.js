@@ -946,7 +946,7 @@
 
     takeHit(item, reason) {
       if (this.invuln > 0 || this.shieldMs > 0) {
-        if (item && item.active) item.destroy();
+        if (this.shieldMs > 0 && item && item.active) item.destroy();
         return;
       }
       if (item && item.active) item.destroy();
