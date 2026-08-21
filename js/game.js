@@ -251,8 +251,6 @@
       this.load.image("intro2", "assets/intro-2.jpg");
       this.load.image("intro3", "assets/intro-3.jpg");
       this.load.image("creditsBg", "assets/credits-bg.jpg");
-      this.load.video("intro", "assets/intro.mp4");
-      this.load.video("credits", "assets/credits.mp4");
       this.load.on("loaderror", (file) => {
         console.warn("optional asset missed", file && file.key);
       });
@@ -264,21 +262,57 @@
     }
   }
 
-  function stopVideo(vid) {
-    if (!vid) return;
-    try { vid.stop(); } catch (_err) { /* ignore */ }
-    try { vid.destroy(); } catch (_err) { /* ignore */ }
-  }
-
   function sweepHtmlVideos() {
-    document.querySelectorAll("#game video, video").forEach((el) => {
+    document.querySelectorAll("#tkd-video, #game video").forEach((el) => {
       try {
-        el.pause();
-        el.removeAttribute("src");
-        el.load();
+        if (el.tagName === "VIDEO") {
+          el.pause();
+          el.removeAttribute("src");
+          el.load();
+        }
         if (el.parentNode) el.parentNode.removeChild(el);
       } catch (_err) { /* ignore */ }
     });
+  }
+
+  function attachVideoOverlay(url, onDone) {
+    sweepHtmlVideos();
+    const root = document.getElementById("game");
+    if (!root) {
+      onDone();
+      return { done: onDone };
+    }
+    root.style.position = "relative";
+    const wrap = document.createElement("div");
+    wrap.id = "tkd-video";
+    wrap.style.cssText = "position:absolute;left:0;top:0;width:100%;height:100%;background:#0b1020;z-index:8;display:flex;align-items:center;justify-content:center;";
+    const vid = document.createElement("video");
+    vid.src = url;
+    vid.muted = true;
+    vid.autoplay = true;
+    vid.playsInline = true;
+    vid.setAttribute("playsinline", "");
+    vid.setAttribute("muted", "");
+    vid.style.cssText = "width:100%;height:100%;object-fit:contain;pointer-events:none;";
+    let finished = false;
+    const done = () => {
+      if (finished) return;
+      finished = true;
+      try {
+        vid.pause();
+        vid.removeAttribute("src");
+        vid.load();
+      } catch (_err) { /* ignore */ }
+      if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+      onDone();
+    };
+    vid.addEventListener("ended", done);
+    vid.addEventListener("error", done);
+    wrap.appendChild(vid);
+    root.appendChild(wrap);
+    const play = vid.play();
+    if (play && play.catch) play.catch(() => done());
+    return { wrap, done };
   }
 
   class VideoScene extends Phaser.Scene {
@@ -290,24 +324,11 @@
     }
     create() {
       this.done = false;
-      this.vid = null;
+      this.overlay = null;
       sweepHtmlVideos();
       this.add.rectangle(W / 2, H / 2, W, H, 0x0b1020);
-      let played = false;
-      if (this.cache.video && this.cache.video.exists(this.videoKey)) {
-        try {
-          this.vid = this.add.video(W / 2, H / 2, this.videoKey);
-          this.vid.setDisplaySize(W, H);
-          this.vid.setMute(true);
-          this.vid.play(false);
-          this.vid.once("complete", () => this.finish());
-          this.time.delayedCall(14000, () => this.finish());
-          played = true;
-        } catch (_err) {
-          played = false;
-        }
-      }
-      if (!played) this.slideshow();
+      this.overlay = attachVideoOverlay(`assets/${this.videoKey}.mp4`, () => this.finish());
+      this.time.delayedCall(14000, () => this.finish());
 
       const skip = this.add.text(W - 28, 22, "SKIP", {
         fontFamily: "Impact, sans-serif",
@@ -345,8 +366,8 @@
     finish() {
       if (this.done) return;
       this.done = true;
-      stopVideo(this.vid);
-      this.vid = null;
+      if (this.overlay && this.overlay.done) this.overlay.done();
+      this.overlay = null;
       sweepHtmlVideos();
       markIntro();
       this.scene.start(this.nextKey);
@@ -1305,51 +1326,7 @@
       this.clearLayer();
       this.blocker.setFillStyle(0x120818, 0.15);
 
-      let played = false;
-      this.creditsVid = null;
-      if (this.cache.video && this.cache.video.exists("credits")) {
-        try {
-          this.creditsVid = this.add.video(W / 2, H / 2, "credits");
-          this.creditsVid.setDisplaySize(W, H);
-          this.creditsVid.setMute(true);
-          this.creditsVid.play(false);
-          this.creditsVid.once("complete", () => this.showMenu());
-          this.layer.add(this.creditsVid);
-          played = true;
-        } catch (_err) {
-          played = false;
-        }
-      }
-      if (!played) {
-        if (this.textures.exists("creditsBg")) {
-          this.layer.add(this.add.image(W / 2, H / 2, "creditsBg").setDisplaySize(W, H));
-        }
-        const names = this.add.text(W / 2, H + 20, [
-          "TAE KWON DOE RILEY",
-          "",
-          "Starring Riley",
-          "Trollocs of the Blight",
-          "A Warder with excellent timing",
-          "Saidin  ·  Saidar",
-          "The Eye of the World",
-          "",
-          "The Wheel weaves as he kicks.",
-          "Thanks for playing.",
-        ].join("\n"), {
-          fontFamily: "Georgia, serif",
-          fontSize: "32px",
-          color: "#fff4c8",
-          align: "center",
-          lineSpacing: 10,
-        }).setOrigin(0.5, 0);
-        this.layer.add(names);
-        this.tweens.add({
-          targets: names,
-          y: -420,
-          duration: 9000,
-          ease: "Linear",
-        });
-      }
+      this.creditsOverlay = attachVideoOverlay("assets/credits.mp4", () => this.showMenu());
 
       const skip = this.add.text(W - 28, 22, "SKIP", {
         fontFamily: "Impact, sans-serif",
@@ -1370,8 +1347,8 @@
       if (this.phase === "menu") return;
       this.phase = "menu";
       if (this.cutTimer) this.cutTimer.remove(false);
-      stopVideo(this.creditsVid);
-      this.creditsVid = null;
+      if (this.creditsOverlay && this.creditsOverlay.done) this.creditsOverlay.done();
+      this.creditsOverlay = null;
       sweepHtmlVideos();
       this.clearLayer();
       this.blocker.setFillStyle(0x120818, 0.55);
@@ -1405,8 +1382,8 @@
     }
 
     goRetry() {
-      stopVideo(this.creditsVid);
-      this.creditsVid = null;
+      if (this.creditsOverlay && this.creditsOverlay.done) this.creditsOverlay.done();
+      this.creditsOverlay = null;
       sweepHtmlVideos();
       this.scene.stop("over");
       this.scene.stop("play");
@@ -1414,8 +1391,8 @@
     }
 
     goTitle() {
-      stopVideo(this.creditsVid);
-      this.creditsVid = null;
+      if (this.creditsOverlay && this.creditsOverlay.done) this.creditsOverlay.done();
+      this.creditsOverlay = null;
       sweepHtmlVideos();
       this.scene.stop("over");
       this.scene.stop("play");
