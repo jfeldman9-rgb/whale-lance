@@ -4,13 +4,14 @@
   const W = 1280;
   const H = 720;
   const LANCE_X = 300;
-  const FLOOR_Y = 598;
-  const CEIL_Y = 118;
+  const FLOOR_Y = 508;
+  const CEIL_Y = 168;
   const SAFE_MS = 12000;
   const HOLD_JET_MS = 220;
   const DOOR_GRACE_MS = 5200;
   const TUTORIAL_MS = 6200;
-  const FOOD_MAGNET = 188;
+  const FOOD_MAGNET = 128;
+  const MAX_FOOD = 4;
 
   const KEYS = {
     best: "whaleLance.best",
@@ -20,11 +21,11 @@
   };
 
   const FOOD = {
-    spaghetti: { inflate: 0.2, score: 50, bonus: true },
-    poi: { inflate: 0.12, score: 22 },
-    musubi: { inflate: 0.13, score: 24 },
-    pineapple: { inflate: 0.1, score: 18 },
-    chocolate: { inflate: 0.22, score: 28, overfill: true },
+    spaghetti: { inflate: 0.14, score: 50, bonus: true },
+    poi: { inflate: 0.08, score: 22 },
+    musubi: { inflate: 0.09, score: 24 },
+    pineapple: { inflate: 0.07, score: 18 },
+    chocolate: { inflate: 0.15, score: 28, overfill: true },
   };
 
   const JOKES = [
@@ -286,7 +287,8 @@
 
     create() {
       this.dead = false;
-      this.fullness = 0.62;
+      this.fullness = 0.56;
+      this.shownPuffyHint = false;
       this.distance = 0;
       this.score = 0;
       this.tootCount = 0;
@@ -326,12 +328,13 @@
       this.pickups = this.physics.add.group();
       this.doors = this.physics.add.group();
 
-      this.lance = this.physics.add.image(LANCE_X, 360, "idleInflated");
+      this.lance = this.physics.add.image(LANCE_X, 350, "idleInflated");
       this.lance.body.allowGravity = true;
-      this.lance.setMaxVelocity(0, 420);
-      this.lance.setDepth(5);
+      this.lance.setMaxVelocity(0, 380);
+      this.lance.setDepth(8);
       this.physics.world.setBounds(0, 0, W, H);
-      this.physics.world.gravity.y = 150;
+      this.physics.world.gravity.y = 90;
+      window.WhaleLance = { play: this };
 
       this.physics.add.overlap(this.lance, this.foods, this.onFood, null, this);
       this.physics.add.overlap(this.lance, this.hazards, this.onHazard, null, this);
@@ -380,12 +383,12 @@
         align: "center",
       }).setOrigin(0.5).setDepth(25).setAlpha(0);
 
-      this.finger = this.add.text(LANCE_X + 150, 250, "👆", {
+      this.finger = this.add.text(LANCE_X + 170, 230, "👆", {
         fontSize: "72px",
       }).setOrigin(0.5).setDepth(25).setAlpha(0);
       this.fingerTween = this.tweens.add({
         targets: this.finger,
-        y: 218,
+        y: 198,
         duration: 380,
         yoyo: true,
         repeat: -1,
@@ -400,6 +403,19 @@
         s: "S",
         down: "DOWN",
       });
+      this.spaceHeld = false;
+      this.input.keyboard.on("keydown-SPACE", () => {
+        if (this.spaceHeld) return;
+        this.spaceHeld = true;
+        this.pointerDownAt = this.time.now;
+        this.hop();
+      });
+      this.input.keyboard.on("keyup-SPACE", () => {
+        this.spaceHeld = false;
+        this.holdToot = false;
+      });
+      this.input.keyboard.on("keydown-S", () => this.doDive());
+      this.input.keyboard.on("keydown-DOWN", () => this.doDive());
 
       this.input.on("pointerdown", (p) => {
         if (this.dead) return;
@@ -418,7 +434,7 @@
         this.swipeStart = null;
       });
 
-      this.time.addEvent({ delay: 780, loop: true, callback: () => this.spawnWave() });
+      this.time.addEvent({ delay: 1250, loop: true, callback: () => this.spawnWave() });
       this.applyLanceLook();
     }
 
@@ -451,9 +467,17 @@
 
     flashPrompt(text, holdMs = 2200) {
       if (this.dead || !this.showTutorial) return;
-      if (this.time.now < this.tapPromptUntil && text !== "TAP TO HOP") {
-        this.time.delayedCall(this.tapPromptUntil - this.time.now + 80, () => this.flashPrompt(text, holdMs));
+      if (this.runMs < TUTORIAL_MS && text !== "TAP TO HOP") {
+        this.time.delayedCall(TUTORIAL_MS - this.runMs + 80, () => this.flashPrompt(text, holdMs));
         return;
+      }
+      if (text !== "TAP TO HOP") {
+        this.tweens.add({
+          targets: this.finger,
+          alpha: 0,
+          duration: 240,
+          onComplete: () => this.fingerTween.pause(),
+        });
       }
       this.prompt.setText(text).setAlpha(1).setScale(1);
       this.tweens.add({
@@ -489,8 +513,8 @@
       this.didTap = true;
       this.maybeLearn();
       const power = this.fullness < 0.2 ? 0.42 : 1;
-      this.lance.setVelocityY(-300 * power);
-      this.spendFuel(0.045);
+      this.lance.setVelocityY(-260 * power);
+      this.spendFuel(0.055);
       this.tootCount += 1;
       this.jetting = true;
       this.time.delayedCall(200, () => { if (!this.holdToot) this.jetting = false; });
@@ -530,10 +554,7 @@
     }
 
     maybeLearn() {
-      if (this.didTap && this.didEat) {
-        markLearned();
-        this.showTutorial = false;
-      }
+      if (this.didTap && this.didEat) markLearned();
     }
 
     greenPuff(scale = 1) {
@@ -556,26 +577,28 @@
       if (this.dead) return;
       const safe = this.runMs < SAFE_MS;
       const yFood = this.nextFoodY();
+      const foodN = this.foods.countActive(true);
 
       if (safe) {
-        this.spawnFood(yFood);
-        if (Math.random() < 0.4) this.spawnFood(Phaser.Math.Clamp(yFood + Phaser.Math.Between(-90, 90), 170, 560));
+        if (foodN < MAX_FOOD) this.spawnFood(yFood);
+        if (foodN < 2 && Math.random() < 0.25) {
+          this.spawnFood(Phaser.Math.Clamp(yFood + Phaser.Math.Between(-80, 80), 190, 500));
+        }
         return;
       }
 
       const roll = Math.random();
-      if (roll < 0.72) {
-        this.spawnFood(yFood);
-        if (Math.random() < 0.22) this.spawnFood(Phaser.Math.Clamp(yFood + 110, 170, 560));
-      } else if (roll < 0.8) {
+      if (roll < 0.74) {
+        if (foodN < MAX_FOOD) this.spawnFood(yFood);
+      } else if (roll < 0.82) {
         this.spawnItem(this.pickups, "stud", yFood, 0.42, { hit: 1.05 });
-      } else if (roll < 0.88) {
-        this.spawnItem(this.doors, "door", Phaser.Math.Between(260, 500), 0.7, { hit: 0.34 });
-      } else if (roll < 0.95) {
-        const gym = this.spawnItem(this.hazards, "gym", yFood, 0.4, { hit: 0.42 });
+      } else if (roll < 0.9) {
+        this.spawnItem(this.doors, "door", Phaser.Math.Between(280, 470), 0.64, { hit: 0.3 });
+      } else if (roll < 0.96) {
+        const gym = this.spawnItem(this.hazards, "gym", yFood, 0.38, { hit: 0.4 });
         this.maybeGymPrompt(gym);
       } else {
-        this.spawnItem(this.hazards, "seagull", Phaser.Math.Between(130, 240), 0.36, { hit: 0.4 });
+        this.spawnItem(this.hazards, "seagull", Phaser.Math.Between(140, 230), 0.34, { hit: 0.38 });
       }
     }
 
@@ -588,7 +611,7 @@
     spawnFood(y) {
       const r = Math.random();
       const kind = r < 0.3 ? "spaghetti" : r < 0.48 ? "poi" : r < 0.66 ? "musubi" : r < 0.84 ? "pineapple" : "chocolate";
-      const item = this.spawnItem(this.foods, kind, y, 0.82, { hit: 1.35 });
+      const item = this.spawnItem(this.foods, kind, y, 0.74, { hit: 1.4 });
       if (this.showTutorial && !this.shownEatPrompt) {
         this.shownEatPrompt = true;
         this.flashPrompt("EAT THE BUFFET", 2600);
@@ -607,7 +630,7 @@
       const item = group.create(W + 90, y, key);
       item.setScale(scale);
       item.body.allowGravity = false;
-      item.setVelocityX(-(this.scroll + 18));
+      item.setVelocityX(this.itemSpeed());
       item.setImmovable(true);
       item.setDepth(3);
       item.setData("kind", key);
@@ -717,25 +740,36 @@
       if (this.lance.texture.key !== key) this.lance.setTexture(key);
 
       const t = Phaser.Math.Clamp(f, 0, 1);
-      const over = Math.max(0, f - 1);
-      let sx = Phaser.Math.Linear(0.78, 1.08, t) + over * 0.42;
-      let sy = Phaser.Math.Linear(0.72, 1.1, t) + over * 0.34;
+      const over = Math.max(0, f - 0.88);
+      let sx;
+      let sy;
+      if (key === "idleDeflated") {
+        sx = 0.58;
+        sy = 0.7;
+      } else {
+        sx = Phaser.Math.Linear(0.46, 0.58, t) + over * 0.22;
+        sy = Phaser.Math.Linear(0.46, 0.6, t) + over * 0.18;
+      }
       if (this.squashFlash > 0) {
-        sx *= 1.22;
-        sy *= 0.72;
+        sx *= 1.18;
+        sy *= 0.74;
       }
       if (this.dive) sy *= 0.86;
       this.lance.setScale(sx, sy);
 
-      const bw = 150 + t * 70 + over * 80;
-      const bh = 88 + t * 110 + over * 50;
+      const bw = 88 + t * 46 + over * 36;
+      const bh = 64 + t * 58 + over * 28;
       this.lance.body.setSize(bw, bh);
       this.lance.body.setOffset((this.lance.width - bw) / 2, (this.lance.height - bh) / 2);
 
       const meterT = Phaser.Math.Clamp(f, 0, 1);
       this.meterFill.width = 504 * Math.max(0.04, meterT);
       this.meterFill.setFillStyle(f > 0.88 ? 0xff5b7a : f < 0.2 ? 0xf0d35a : 0x7ad36a);
-      this.meterLabel.setText(f > 0.88 ? "TOO FULL" : "BUFFET FUEL");
+      this.meterLabel.setText("BUFFET FUEL");
+      if (f > 0.88 && !this.shownPuffyHint) {
+        this.shownPuffyHint = true;
+        this.flashWarn("Too full — toot to shrink!", 2600);
+      }
     }
 
     magnetFoods(dt) {
@@ -745,7 +779,7 @@
         const dy = this.lance.y - food.y;
         const dist = Math.hypot(dx, dy);
         if (dist < FOOD_MAGNET && dist > 8) {
-          const pull = ((FOOD_MAGNET - dist) / FOOD_MAGNET) * 320 * (dt / 1000);
+          const pull = ((FOOD_MAGNET - dist) / FOOD_MAGNET) * 210 * (dt / 1000);
           food.x += (dx / dist) * pull;
           food.y += (dy / dist) * pull;
         }
@@ -773,21 +807,15 @@
       this.invuln = Math.max(0, this.invuln - dt);
 
       const spaceDown = this.cursors.space.isDown;
-      if (Phaser.Input.Keyboard.JustDown(this.cursors.space)) {
-        this.pointerDownAt = this.time.now;
-        this.hop();
-      }
+      if (spaceDown) this.holdToot = true;
       if (spaceDown || this.holdToot) this.holdJet(dt);
       else this.jetting = this.eatFlash > 0 ? this.jetting : false;
-      if (Phaser.Input.Keyboard.JustDown(this.cursors.s) || Phaser.Input.Keyboard.JustDown(this.cursors.down)) {
-        this.doDive();
-      }
 
       this.eatFlash = Math.max(0, this.eatFlash - dt);
       this.squashFlash = Math.max(0, this.squashFlash - dt);
 
-      const bob = Math.sin(this.runMs / 430) * 22;
-      this.lance.body.velocity.y += bob * 0.9 * (dt / 16.67);
+      const targetY = 348 + Math.sin(this.runMs / 520) * 22;
+      this.lance.body.velocity.y += (targetY - this.lance.y) * 0.055;
 
       const ramp = Math.min(92, this.runMs / 1000 * 1.15);
       this.scroll = 86 + ramp;
@@ -826,8 +854,12 @@
       this.syncScrollVelocities();
     }
 
+    itemSpeed() {
+      return -(this.scroll + 128);
+    }
+
     syncScrollVelocities() {
-      const vx = -(this.scroll + 18);
+      const vx = this.itemSpeed();
       const setVx = (group) => {
         group.children.iterate((child) => {
           if (child && child.body) child.setVelocityX(vx);
@@ -937,7 +969,7 @@
     },
     physics: {
       default: "arcade",
-      arcade: { gravity: { y: 150 }, fps: 60, debug: false },
+      arcade: { gravity: { y: 90 }, fps: 60, debug: false },
     },
     fps: { target: 60, forceSetTimeOut: false },
     scene: [BootScene, TitleScene, PlayScene, OverScene],
