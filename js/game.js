@@ -264,6 +264,23 @@
     }
   }
 
+  function stopVideo(vid) {
+    if (!vid) return;
+    try { vid.stop(); } catch (_err) { /* ignore */ }
+    try { vid.destroy(); } catch (_err) { /* ignore */ }
+  }
+
+  function sweepHtmlVideos() {
+    document.querySelectorAll("#game video, video").forEach((el) => {
+      try {
+        el.pause();
+        el.removeAttribute("src");
+        el.load();
+        if (el.parentNode) el.parentNode.removeChild(el);
+      } catch (_err) { /* ignore */ }
+    });
+  }
+
   class VideoScene extends Phaser.Scene {
     constructor(key, videoKey, nextKey, frames) {
       super(key);
@@ -273,15 +290,17 @@
     }
     create() {
       this.done = false;
+      this.vid = null;
+      sweepHtmlVideos();
       this.add.rectangle(W / 2, H / 2, W, H, 0x0b1020);
       let played = false;
       if (this.cache.video && this.cache.video.exists(this.videoKey)) {
         try {
-          const vid = this.add.video(W / 2, H / 2, this.videoKey);
-          vid.setDisplaySize(W, H);
-          vid.setMute(true);
-          vid.play(false);
-          vid.once("complete", () => this.finish());
+          this.vid = this.add.video(W / 2, H / 2, this.videoKey);
+          this.vid.setDisplaySize(W, H);
+          this.vid.setMute(true);
+          this.vid.play(false);
+          this.vid.once("complete", () => this.finish());
           this.time.delayedCall(14000, () => this.finish());
           played = true;
         } catch (_err) {
@@ -326,6 +345,9 @@
     finish() {
       if (this.done) return;
       this.done = true;
+      stopVideo(this.vid);
+      this.vid = null;
+      sweepHtmlVideos();
       markIntro();
       this.scene.start(this.nextKey);
     }
@@ -342,6 +364,7 @@
       super("title");
     }
     create() {
+      sweepHtmlVideos();
       this.drawBackdrop();
       const riley = this.add.image(340, 400, "rileyTitle").setScale(0.92);
       this.tweens.add({
@@ -451,6 +474,7 @@
     }
 
     create() {
+      sweepHtmlVideos();
       this.dead = false;
       this.saidin = 0.22;
       this.saidar = 0.18;
@@ -1282,14 +1306,15 @@
       this.blocker.setFillStyle(0x120818, 0.15);
 
       let played = false;
+      this.creditsVid = null;
       if (this.cache.video && this.cache.video.exists("credits")) {
         try {
-          const vid = this.add.video(W / 2, H / 2, "credits");
-          vid.setDisplaySize(W, H);
-          vid.setMute(true);
-          vid.play(false);
-          vid.once("complete", () => this.showMenu());
-          this.layer.add(vid);
+          this.creditsVid = this.add.video(W / 2, H / 2, "credits");
+          this.creditsVid.setDisplaySize(W, H);
+          this.creditsVid.setMute(true);
+          this.creditsVid.play(false);
+          this.creditsVid.once("complete", () => this.showMenu());
+          this.layer.add(this.creditsVid);
           played = true;
         } catch (_err) {
           played = false;
@@ -1345,6 +1370,9 @@
       if (this.phase === "menu") return;
       this.phase = "menu";
       if (this.cutTimer) this.cutTimer.remove(false);
+      stopVideo(this.creditsVid);
+      this.creditsVid = null;
+      sweepHtmlVideos();
       this.clearLayer();
       this.blocker.setFillStyle(0x120818, 0.55);
       this.drawOverCard(false);
@@ -1377,12 +1405,18 @@
     }
 
     goRetry() {
+      stopVideo(this.creditsVid);
+      this.creditsVid = null;
+      sweepHtmlVideos();
       this.scene.stop("over");
       this.scene.stop("play");
       this.scene.start("play");
     }
 
     goTitle() {
+      stopVideo(this.creditsVid);
+      this.creditsVid = null;
+      sweepHtmlVideos();
       this.scene.stop("over");
       this.scene.stop("play");
       this.scene.start("title");
