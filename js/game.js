@@ -16,6 +16,7 @@
   const PUFFY = 0.88;
   const FROYO_DRAIN = 0.4;
   const FROYO_EMPTY = 0.28;
+  const FROYO_H = 118;
 
   const KEYS = {
     best: "whaleLance.best",
@@ -736,13 +737,20 @@
       else if (r < 0.66) kind = "musubi";
       else if (r < 0.84) kind = "pineapple";
       else kind = "chocolate";
-      const scale = kind === "froyo" ? 0.82 : 0.74;
-      const item = this.spawnItem(this.foods, kind, y, scale, { hit: kind === "froyo" ? 1.15 : 1.4 });
+      const scale = kind === "froyo" ? this.froyoScale() : 0.74;
+      const item = this.spawnItem(this.foods, kind, y, scale, { hit: kind === "froyo" ? 0.88 : 1.4 });
       if (this.showTutorial && !this.shownEatPrompt && kind !== "froyo") {
         this.shownEatPrompt = true;
         this.flashPrompt("EAT THE BUFFET", 2600);
       }
       return item;
+    }
+
+    froyoScale() {
+      const tex = this.textures.get("froyo");
+      const src = tex && tex.getSourceImage && tex.getSourceImage();
+      const h = src && src.height ? src.height : 842;
+      return Phaser.Math.Clamp(FROYO_H / h, 0.08, 0.55);
     }
 
     maybeGymPrompt(gym) {
