@@ -1,6 +1,6 @@
 # Whale Lance
 
-Jason’s dad Lance is a cartoon whale on a Hawaiian cruise. Eat the buffet. Toot for thrust. Deflate like a balloon. Tone is warm dad-joke, never mean.
+Jason’s dad Lance is a cartoon whale on the Pride of America. He always swims forward. Tap to hop, eat the buffet, and skip the gym. Tone is warm dad-joke, never mean.
 
 Play locally: open `index.html`, or serve the repo root (`npx serve .`). Landscape 16:9, touch + keyboard, no accounts.
 
@@ -8,18 +8,19 @@ Play locally: open `index.html`, or serve the repo root (`npx serve .`). Landsca
 
 Title → play → game over → retry.
 
-- **Tap / Space:** short toot (hop + small deflate)
-- **Hold / hold Space:** sustained jet (continuous deflate)
-- **Swipe down / S or Down:** dive
-- Eat food to refill the Fart Meter and inflate
-- Fried spaghetti = bonus inflate · chocolate fountain = overfill
-- Too puffy? Cabin doors will stop you. Too empty? Pancake whale.
-- Hit gym gear, seagulls, or “No Farting” signs and that’s a wrap
-- Score: distance + toot combos + rare stud pickups
+- **Tap / Space:** hop (short toot + green puff). That is the only required control.
+- **Hold:** optional extra boost / jet (uses more buffet fuel)
+- **Swipe down / S or Down:** optional dive
+- Swim into food to eat it. Hitboxes are large; nearby plates drift toward Lance.
+- Fried spaghetti is the hero pickup. Chocolate overfills (funny squash) but is not a trap.
+- **BUFFET FUEL** fills when you eat and shrinks when you hop. Empty fuel means weaker hops, not game over.
+- Too puffy? Cabin doors flash “Too full — toot to shrink!” and give you time. The first door of a run only bounces you.
+- Gym gear and seagulls are rare. First hit of a run is a free “oof.” Second hit ends the cruise with a warm joke.
+- First-run overlays: TAP TO HOP, EAT THE BUFFET, AVOID THE GYM. After one tap and one bite they stay away (`localStorage`).
 - Best + last run saved in `localStorage`
 - Mute button (🔊)
 
-The body **squashes on X/Y** from beach-ball (`idle-inflated`) to pancake (`idle-deflated`). Jet uses `fart-blast.png`. Spaghetti uses `eat.png`. Title uses the v2 likeness (`title.png`: real beach-photo face, red polo, white towel, whale body).
+Lance auto-bobs, stays on screen, and cannot pancake-die from falling. The body still reads as beach-ball full or towel-deflated. Jet uses `fart-blast.png`. Spaghetti uses `eat.png`. Title uses the v2 likeness (`title.png`: real beach-photo face, red polo, white towel, whale body).
 
 ## Art
 
