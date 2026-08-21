@@ -3,18 +3,29 @@
 
   const W = 1280;
   const H = 720;
+  const LANCE_X = 300;
+  const FLOOR_Y = 508;
+  const CEIL_Y = 168;
+  const SAFE_MS = 12000;
+  const HOLD_JET_MS = 220;
+  const DOOR_GRACE_MS = 5200;
+  const TUTORIAL_MS = 6200;
+  const FOOD_MAGNET = 128;
+  const MAX_FOOD = 4;
+
   const KEYS = {
     best: "whaleLance.best",
     last: "whaleLance.last",
     mute: "whaleLance.mute",
+    learned: "whaleLance.learned",
   };
 
   const FOOD = {
-    spaghetti: { inflate: 0.24, score: 40, bonus: true },
-    poi: { inflate: 0.12, score: 20 },
-    musubi: { inflate: 0.14, score: 24 },
-    pineapple: { inflate: 0.1, score: 18 },
-    chocolate: { inflate: 0.34, score: 30, overfill: true },
+    spaghetti: { inflate: 0.14, score: 50, bonus: true },
+    poi: { inflate: 0.08, score: 22 },
+    musubi: { inflate: 0.09, score: 24 },
+    pineapple: { inflate: 0.07, score: 18 },
+    chocolate: { inflate: 0.15, score: 28, overfill: true },
   };
 
   const JOKES = [
@@ -44,6 +55,14 @@
 
   function setMuted(on) {
     localStorage.setItem(KEYS.mute, on ? "1" : "0");
+  }
+
+  function hasLearned() {
+    return localStorage.getItem(KEYS.learned) === "1";
+  }
+
+  function markLearned() {
+    localStorage.setItem(KEYS.learned, "1");
   }
 
   const AudioKit = {
@@ -97,6 +116,14 @@
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
         osc.start(now);
         osc.stop(now + 0.22);
+      } else if (kind === "oof") {
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(180, now);
+        osc.frequency.exponentialRampToValueAtTime(70, now + 0.16);
+        gain.gain.setValueAtTime(0.07, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+        osc.start(now);
+        osc.stop(now + 0.2);
       } else if (kind === "bonk") {
         osc.type = "square";
         osc.frequency.setValueAtTime(140, now);
@@ -166,55 +193,62 @@
         ease: "Sine.inOut",
       });
 
-      this.add.text(820, 118, "WHALE LANCE", {
+      this.add.text(820, 108, "WHALE LANCE", {
         fontFamily: "Georgia, Impact, serif",
-        fontSize: "72px",
+        fontSize: "76px",
         color: "#fff4c8",
         stroke: "#8b1e2d",
         strokeThickness: 8,
       }).setOrigin(0.5);
 
-      this.add.text(820, 188, "Eat. Toot. Repeat.\n(Please aim away from the buffet.)", {
-        fontFamily: "Georgia, serif",
-        fontSize: "24px",
-        color: "#ffe7a8",
+      this.add.text(820, 198, "Tap to hop. Eat the buffet. Don't hit the gym.", {
+        fontFamily: "Trebuchet MS, sans-serif",
+        fontSize: "26px",
+        color: "#fff6d0",
         align: "center",
-        lineSpacing: 6,
+        wordWrap: { width: 560 },
       }).setOrigin(0.5);
 
       const { best, last } = loadScores();
       const lastLine = last
-        ? `Last run: ${last.score}  ·  ${last.reason}`
-        : "Last run: none yet — the pancakes are waiting.";
-      this.add.text(820, 278, `Best: ${best}\n${lastLine}`, {
+        ? `Last ${last.score}`
+        : "Last —";
+      this.add.text(820, 268, `Best ${best}   ·   ${lastLine}`, {
         fontFamily: "Trebuchet MS, sans-serif",
-        fontSize: "22px",
+        fontSize: "24px",
         color: "#e8f6ff",
-        align: "center",
-        lineSpacing: 8,
       }).setOrigin(0.5);
 
-      this.add.text(820, 368, "Tap / Space: short toot   ·   Hold: jet   ·   S / swipe down: dive", {
-        fontFamily: "Trebuchet MS, sans-serif",
-        fontSize: "18px",
-        color: "#cfefff",
-      }).setOrigin(0.5);
-
-      this.add.text(820, 410, Phaser.Utils.Array.GetRandom(JOKES), {
+      this.add.text(820, 318, Phaser.Utils.Array.GetRandom(JOKES), {
         fontFamily: "Georgia, serif",
-        fontSize: "20px",
+        fontSize: "22px",
         fontStyle: "italic",
         color: "#ffd7e8",
       }).setOrigin(0.5);
 
-      this.makeButton(820, 500, "PLAY", () => {
+      const play = this.makeButton(820, 470, "PLAY", () => {
         AudioKit.ensure();
         this.scene.start("play");
+      }, 420, 118, 64);
+      this.tweens.add({
+        targets: [play.bg, play.txt],
+        scaleX: 1.04,
+        scaleY: 1.04,
+        duration: 700,
+        yoyo: true,
+        repeat: -1,
+        ease: "Sine.inOut",
       });
 
       this.addMute(40, 40);
-      this.input.keyboard.once("keydown-SPACE", () => this.scene.start("play"));
-      this.input.keyboard.once("keydown-ENTER", () => this.scene.start("play"));
+      this.input.keyboard.once("keydown-SPACE", () => {
+        AudioKit.ensure();
+        this.scene.start("play");
+      });
+      this.input.keyboard.once("keydown-ENTER", () => {
+        AudioKit.ensure();
+        this.scene.start("play");
+      });
     }
 
     drawBackdrop() {
@@ -222,11 +256,13 @@
       this.add.rectangle(W / 2, H / 2, W, H, 0x04283c, 0.28);
     }
 
-    makeButton(x, y, label, onClick) {
-      const bg = this.add.rectangle(x, y, 260, 72, 0xe31c3d, 1).setStrokeStyle(4, 0xfff1b0).setInteractive({ useHandCursor: true });
+    makeButton(x, y, label, onClick, bw = 260, bh = 72, fontSize = 40) {
+      const bg = this.add.rectangle(x, y, bw, bh, 0xe31c3d, 1)
+        .setStrokeStyle(5, 0xfff1b0)
+        .setInteractive({ useHandCursor: true });
       const txt = this.add.text(x, y, label, {
         fontFamily: "Impact, Georgia, serif",
-        fontSize: "40px",
+        fontSize: `${fontSize}px`,
         color: "#fff8e0",
       }).setOrigin(0.5);
       bg.on("pointerover", () => bg.setFillStyle(0xff4b62));
@@ -251,22 +287,34 @@
 
     create() {
       this.dead = false;
-      this.fullness = 0.68;
+      this.fullness = 0.56;
+      this.shownPuffyHint = false;
       this.distance = 0;
       this.score = 0;
-      this.combo = 0;
-      this.comboTimer = 0;
       this.tootCount = 0;
       this.studs = 0;
       this.holdToot = false;
       this.jetting = false;
       this.eatFlash = 0;
+      this.squashFlash = 0;
       this.dive = false;
-      this.scroll = 220;
-      this.spawnAt = 0;
+      this.scroll = 86;
       this.pointerDownAt = 0;
       this.swipeStart = null;
       this.jetSfx = 0;
+      this.runMs = 0;
+      this.didTap = false;
+      this.didEat = false;
+      this.freeHitUsed = false;
+      this.invuln = 0;
+      this.firstDoorBounced = false;
+      this.doorGraceUntil = 0;
+      this.puffyWarnUntil = 0;
+      this.shownEatPrompt = false;
+      this.shownGymPrompt = false;
+      this.showTutorial = !hasLearned();
+      this.tapPromptUntil = 0;
+      this.foodLane = 0;
 
       this.bgFar1 = this.add.image(0, H / 2, "bgFar").setOrigin(0, 0.5).setDisplaySize(W, H);
       this.bgFar2 = this.add.image(W, H / 2, "bgFar").setOrigin(0, 0.5).setDisplaySize(W, H);
@@ -279,72 +327,103 @@
       this.hazards = this.physics.add.group();
       this.pickups = this.physics.add.group();
       this.doors = this.physics.add.group();
-      this.puffs = this.add.group();
 
-      this.lance = this.physics.add.image(300, 360, "idleInflated");
-      this.lance.setCollideWorldBounds(true);
-      this.lance.body.setSize(220, 180);
-      this.lance.body.setOffset(200, 220);
-      this.lance.setDepth(5);
-      this.physics.world.setBounds(40, 70, W - 80, H - 140);
-      this.lance.setMaxVelocity(0, 680);
+      this.lance = this.physics.add.image(LANCE_X, 350, "idleInflated");
       this.lance.body.allowGravity = true;
-      this.physics.world.gravity.y = 760;
+      this.lance.setMaxVelocity(0, 380);
+      this.lance.setDepth(8);
+      this.physics.world.setBounds(0, 0, W, H);
+      this.physics.world.gravity.y = 90;
+      window.WhaleLance = { play: this };
 
       this.physics.add.overlap(this.lance, this.foods, this.onFood, null, this);
       this.physics.add.overlap(this.lance, this.hazards, this.onHazard, null, this);
       this.physics.add.overlap(this.lance, this.pickups, this.onStud, null, this);
       this.physics.add.overlap(this.lance, this.doors, this.onDoor, null, this);
 
-      this.scoreText = this.add.text(24, 16, "", {
-        fontFamily: "Trebuchet MS, sans-serif",
-        fontSize: "26px",
+      this.scoreText = this.add.text(28, 18, "Score 0", {
+        fontFamily: "Impact, Trebuchet MS, sans-serif",
+        fontSize: "40px",
         color: "#fff8dc",
         stroke: "#123",
-        strokeThickness: 4,
+        strokeThickness: 6,
       }).setDepth(20);
-      this.comboText = this.add.text(24, 50, "", {
-        fontFamily: "Trebuchet MS, sans-serif",
-        fontSize: "20px",
-        color: "#ffe27a",
-        stroke: "#123",
-        strokeThickness: 3,
-      }).setDepth(20);
-      this.hint = this.add.text(W / 2, H - 28, "Tap or Space to toot  ·  Hold to jet  ·  S / swipe down to dive", {
-        fontFamily: "Trebuchet MS, sans-serif",
-        fontSize: "18px",
-        color: "#e8f7ff",
-      }).setOrigin(0.5).setDepth(20);
 
-      this.meterBack = this.add.rectangle(W / 2, 36, 360, 22, 0x173246).setStrokeStyle(3, 0xfff1b0).setDepth(20);
-      this.meterFill = this.add.rectangle(W / 2 - 176, 36, 352, 14, 0x7ad36a).setOrigin(0, 0.5).setDepth(21);
-      this.meterLabel = this.add.text(W / 2, 36, "FART METER", {
+      this.meterBack = this.add.rectangle(W / 2, 42, 520, 40, 0x173246).setStrokeStyle(4, 0xfff1b0).setDepth(20);
+      this.meterFill = this.add.rectangle(W / 2 - 252, 42, 504, 28, 0x7ad36a).setOrigin(0, 0.5).setDepth(21);
+      this.meterLabel = this.add.text(W / 2, 42, "BUFFET FUEL", {
         fontFamily: "Impact, sans-serif",
-        fontSize: "16px",
+        fontSize: "26px",
         color: "#14301c",
       }).setOrigin(0.5).setDepth(22);
 
-      this.muteBtn = this.add.text(W - 58, 16, isMuted() ? "🔇" : "🔊", { fontSize: "34px" })
+      this.warnText = this.add.text(W / 2, 92, "", {
+        fontFamily: "Impact, Trebuchet MS, sans-serif",
+        fontSize: "28px",
+        color: "#ffe27a",
+        stroke: "#3a1a10",
+        strokeThickness: 5,
+      }).setOrigin(0.5).setDepth(24).setAlpha(0);
+
+      this.muteBtn = this.add.text(W - 58, 16, isMuted() ? "🔇" : "🔊", { fontSize: "38px" })
         .setInteractive({ useHandCursor: true })
         .setDepth(22);
       this.muteBtn.on("pointerdown", (p) => {
-        p.event.stopPropagation();
+        if (p.event && p.event.stopPropagation) p.event.stopPropagation();
         setMuted(!isMuted());
         this.muteBtn.setText(isMuted() ? "🔇" : "🔊");
       });
+
+      this.prompt = this.add.text(W / 2, 168, "", {
+        fontFamily: "Impact, Georgia, serif",
+        fontSize: "62px",
+        color: "#fff4c8",
+        stroke: "#8b1e2d",
+        strokeThickness: 8,
+        align: "center",
+      }).setOrigin(0.5).setDepth(25).setAlpha(0);
+
+      this.finger = this.add.text(LANCE_X + 170, 230, "👆", {
+        fontSize: "72px",
+      }).setOrigin(0.5).setDepth(25).setAlpha(0);
+      this.fingerTween = this.tweens.add({
+        targets: this.finger,
+        y: 198,
+        duration: 380,
+        yoyo: true,
+        repeat: -1,
+        ease: "Sine.inOut",
+        paused: true,
+      });
+
+      if (this.showTutorial) this.startTapTutorial();
 
       this.cursors = this.input.keyboard.addKeys({
         space: "SPACE",
         s: "S",
         down: "DOWN",
       });
+      this.spaceHeld = false;
+      this.input.keyboard.on("keydown-SPACE", () => {
+        if (this.spaceHeld) return;
+        this.spaceHeld = true;
+        this.pointerDownAt = this.time.now;
+        this.hop();
+      });
+      this.input.keyboard.on("keyup-SPACE", () => {
+        this.spaceHeld = false;
+        this.holdToot = false;
+      });
+      this.input.keyboard.on("keydown-S", () => this.doDive());
+      this.input.keyboard.on("keydown-DOWN", () => this.doDive());
 
       this.input.on("pointerdown", (p) => {
-        if (p.y < 70 && p.x > W - 90) return;
+        if (this.dead) return;
+        if (p.y < 80 && p.x > W - 100) return;
         this.pointerDownAt = this.time.now;
         this.swipeStart = { x: p.x, y: p.y, t: this.time.now };
         this.holdToot = true;
-        this.shortToot();
+        this.hop();
       });
       this.input.on("pointerup", (p) => {
         this.holdToot = false;
@@ -355,102 +434,209 @@
         this.swipeStart = null;
       });
 
-      this.time.addEvent({ delay: 900, loop: true, callback: () => this.spawnWave() });
+      this.time.addEvent({ delay: 1250, loop: true, callback: () => this.spawnWave() });
       this.applyLanceLook();
     }
 
-    shortToot() {
+    startTapTutorial() {
+      this.tapPromptUntil = this.time.now + TUTORIAL_MS;
+      this.prompt.setText("TAP TO HOP").setAlpha(1);
+      this.finger.setAlpha(1);
+      this.fingerTween.play();
+      this.tweens.add({
+        targets: this.prompt,
+        scale: 1.08,
+        duration: 420,
+        yoyo: true,
+        repeat: 6,
+      });
+      this.time.delayedCall(TUTORIAL_MS, () => {
+        if (this.prompt.text === "TAP TO HOP") this.fadePrompt();
+        this.tweens.add({
+          targets: this.finger,
+          alpha: 0,
+          duration: 420,
+          onComplete: () => this.fingerTween.pause(),
+        });
+      });
+    }
+
+    fadePrompt() {
+      this.tweens.add({ targets: this.prompt, alpha: 0, duration: 400 });
+    }
+
+    flashPrompt(text, holdMs = 2200) {
+      if (this.dead || !this.showTutorial) return;
+      if (this.runMs < TUTORIAL_MS && text !== "TAP TO HOP") {
+        this.time.delayedCall(TUTORIAL_MS - this.runMs + 80, () => this.flashPrompt(text, holdMs));
+        return;
+      }
+      if (text !== "TAP TO HOP") {
+        this.tweens.add({
+          targets: this.finger,
+          alpha: 0,
+          duration: 240,
+          onComplete: () => this.fingerTween.pause(),
+        });
+      }
+      this.prompt.setText(text).setAlpha(1).setScale(1);
+      this.tweens.add({
+        targets: this.prompt,
+        scale: 1.06,
+        duration: 180,
+        yoyo: true,
+        repeat: 3,
+      });
+      this.time.delayedCall(holdMs, () => {
+        if (this.prompt.text === text) this.fadePrompt();
+      });
+    }
+
+    flashWarn(text, holdMs = 2400) {
+      this.warnText.setText(text).setAlpha(1);
+      this.tweens.add({
+        targets: this.warnText,
+        alpha: 0.35,
+        duration: 160,
+        yoyo: true,
+        repeat: 6,
+      });
+      this.time.delayedCall(holdMs, () => {
+        if (this.warnText.text === text) {
+          this.tweens.add({ targets: this.warnText, alpha: 0, duration: 280 });
+        }
+      });
+    }
+
+    hop() {
       if (this.dead) return;
-      const power = this.fullness < 0.28 ? 0.45 : 1;
-      this.lance.setVelocityY(-420 * power);
-      this.deflate(0.075);
+      this.didTap = true;
+      this.maybeLearn();
+      const power = this.fullness < 0.2 ? 0.42 : 1;
+      this.lance.setVelocityY(-260 * power);
+      this.spendFuel(0.055);
       this.tootCount += 1;
-      this.combo += 1;
-      this.comboTimer = 1400;
-      this.score += 12 * this.combo;
       this.jetting = true;
-      this.time.delayedCall(220, () => { if (!this.holdToot) this.jetting = false; });
-      this.puff();
+      this.time.delayedCall(200, () => { if (!this.holdToot) this.jetting = false; });
+      this.greenPuff();
       AudioKit.beep("toot");
     }
 
     holdJet(dt) {
       if (this.dead) return;
-      const power = this.fullness < 0.28 ? 0.35 : 1;
-      this.lance.setVelocityY(this.lance.body.velocity.y - 1680 * power * (dt / 1000));
-      this.deflate(0.22 * (dt / 1000));
+      if (this.time.now - this.pointerDownAt < HOLD_JET_MS) return;
+
+      const power = this.fullness < 0.2 ? 0.34 : 1;
+      this.lance.setVelocityY(this.lance.body.velocity.y - 980 * power * (dt / 1000));
+      this.spendFuel(0.16 * (dt / 1000));
       this.jetting = true;
       this.jetSfx -= dt;
       if (this.jetSfx <= 0) {
         AudioKit.beep("jet");
         this.jetSfx = 90;
-        this.puff();
+        this.greenPuff(0.7);
       }
     }
 
     doDive() {
       if (this.dead) return;
-      this.lance.setVelocityY(Math.max(this.lance.body.velocity.y, 0) + 420);
+      this.lance.setVelocityY(Math.max(this.lance.body.velocity.y, 0) + 280);
       this.dive = true;
       this.time.delayedCall(180, () => { this.dive = false; });
     }
 
-    deflate(amount) {
+    spendFuel(amount) {
       this.fullness = Math.max(0, this.fullness - amount);
     }
 
-    inflate(amount) {
-      this.fullness = Math.min(1.18, this.fullness + amount);
+    addFuel(amount) {
+      this.fullness = Math.min(1.16, this.fullness + amount);
     }
 
-    puff() {
-      const puff = this.add.image(this.lance.x - 90, this.lance.y + 30, "cloud")
-        .setScale(0.45)
-        .setAlpha(0.85)
+    maybeLearn() {
+      if (this.didTap && this.didEat) markLearned();
+    }
+
+    greenPuff(scale = 1) {
+      const puff = this.add.image(this.lance.x - 96, this.lance.y + 36, "cloud")
+        .setScale(0.42 * scale)
+        .setAlpha(0.9)
+        .setTint(0x7dff6a)
         .setDepth(4);
-      this.puffs.add(puff);
       this.tweens.add({
         targets: puff,
-        x: puff.x - 140,
+        x: puff.x - 130,
         alpha: 0,
-        scale: 0.9,
-        duration: 420,
+        scale: 0.85 * scale,
+        duration: 400,
         onComplete: () => puff.destroy(),
       });
     }
 
     spawnWave() {
       if (this.dead) return;
-      const y = Phaser.Math.Between(140, 580);
+      const safe = this.runMs < SAFE_MS;
+      const yFood = this.nextFoodY();
+      const foodN = this.foods.countActive(true);
+
+      if (safe) {
+        if (foodN < MAX_FOOD) this.spawnFood(yFood);
+        if (foodN < 2 && Math.random() < 0.25) {
+          this.spawnFood(Phaser.Math.Clamp(yFood + Phaser.Math.Between(-80, 80), 190, 500));
+        }
+        return;
+      }
+
       const roll = Math.random();
-      if (roll < 0.46) {
-        const r = Math.random();
-        const kind = r < 0.22 ? "spaghetti" : r < 0.42 ? "poi" : r < 0.62 ? "musubi" : r < 0.82 ? "pineapple" : "chocolate";
-        this.spawnItem(this.foods, kind, y, 0.58 + Math.random() * 0.1);
-      } else if (roll < 0.58) {
-        this.spawnItem(this.pickups, "stud", y, 0.38);
-      } else if (roll < 0.72) {
-        this.spawnItem(this.doors, "door", Phaser.Math.Between(240, 500), 0.62);
-      } else if (roll < 0.84) {
-        this.spawnItem(this.hazards, "gym", y, 0.62);
-      } else if (roll < 0.93) {
-        this.spawnItem(this.hazards, "seagull", Phaser.Math.Between(110, 260), 0.46);
+      if (roll < 0.74) {
+        if (foodN < MAX_FOOD) this.spawnFood(yFood);
+      } else if (roll < 0.82) {
+        this.spawnItem(this.pickups, "stud", yFood, 0.42, { hit: 1.05 });
+      } else if (roll < 0.9) {
+        this.spawnItem(this.doors, "door", Phaser.Math.Between(280, 470), 0.64, { hit: 0.3 });
+      } else if (roll < 0.96) {
+        const gym = this.spawnItem(this.hazards, "gym", yFood, 0.38, { hit: 0.4 });
+        this.maybeGymPrompt(gym);
       } else {
-        this.spawnItem(this.hazards, "sign", y, 0.48);
+        this.spawnItem(this.hazards, "seagull", Phaser.Math.Between(140, 230), 0.34, { hit: 0.38 });
       }
     }
 
-    spawnItem(group, key, y, scale) {
-      const item = group.create(W + 80, y, key);
+    nextFoodY() {
+      this.foodLane = (this.foodLane + 1) % 5;
+      const lanes = [250, 340, 420, 300, 480];
+      return Phaser.Math.Clamp(lanes[this.foodLane] + Phaser.Math.Between(-24, 24), 170, 560);
+    }
+
+    spawnFood(y) {
+      const r = Math.random();
+      const kind = r < 0.3 ? "spaghetti" : r < 0.48 ? "poi" : r < 0.66 ? "musubi" : r < 0.84 ? "pineapple" : "chocolate";
+      const item = this.spawnItem(this.foods, kind, y, 0.74, { hit: 1.4 });
+      if (this.showTutorial && !this.shownEatPrompt) {
+        this.shownEatPrompt = true;
+        this.flashPrompt("EAT THE BUFFET", 2600);
+      }
+      return item;
+    }
+
+    maybeGymPrompt(gym) {
+      if (this.showTutorial && !this.shownGymPrompt && gym) {
+        this.shownGymPrompt = true;
+        this.flashPrompt("AVOID THE GYM", 2600);
+      }
+    }
+
+    spawnItem(group, key, y, scale, opts = {}) {
+      const item = group.create(W + 90, y, key);
       item.setScale(scale);
       item.body.allowGravity = false;
-      item.setVelocityX(-(this.scroll + 40));
+      item.setVelocityX(this.itemSpeed());
       item.setImmovable(true);
       item.setDepth(3);
       item.setData("kind", key);
-      if (key === "door") {
-        item.body.setSize(item.width * 0.28, item.height * 0.92);
-      }
+      const hit = opts.hit == null ? 1 : opts.hit;
+      item.body.setSize(item.width * hit, item.height * hit);
+      item.body.setOffset((item.width - item.body.width) / 2, (item.height - item.body.height) / 2);
       return item;
     }
 
@@ -458,12 +644,19 @@
       const kind = item.getData("kind");
       const spec = FOOD[kind] || FOOD.poi;
       item.destroy();
-      this.inflate(spec.inflate);
+      this.addFuel(spec.inflate);
       this.score += spec.score + (spec.bonus ? 20 : 0);
       this.eatFlash = kind === "spaghetti" ? 720 : 520;
       this.jetting = false;
+      this.didEat = true;
+      this.maybeLearn();
       AudioKit.beep("eat");
-      this.floatLabel(lance.x, lance.y - 70, spec.overfill ? "Chocolate fountain!" : spec.bonus ? "Fried spaghetti!" : "Yum");
+      if (spec.overfill) {
+        this.squashFlash = 420;
+        this.floatLabel(lance.x, lance.y - 70, "Chocolate fountain!");
+      } else {
+        this.floatLabel(lance.x, lance.y - 70, spec.bonus ? "Fried spaghetti!" : "Yum");
+      }
     }
 
     onStud(lance, item) {
@@ -475,25 +668,56 @@
     }
 
     onHazard(lance, item) {
+      if (this.invuln > 0) return;
       const kind = item.getData("kind");
+      item.destroy();
+      if (!this.freeHitUsed) {
+        this.freeHitUsed = true;
+        this.invuln = 1400;
+        this.lance.setVelocityY(-180);
+        this.lance.x = Math.max(180, this.lance.x - 36);
+        this.floatLabel(lance.x, lance.y - 60, "oof");
+        this.flashWarn("oof — still swimming!", 1600);
+        this.cameras.main.flash(180, 255, 230, 180);
+        AudioKit.beep("oof");
+        return;
+      }
       const reasons = {
-        gym: "Skipped the gym. The gym did not skip you.",
-        seagull: "A seagull filed a complaint.",
-        sign: "The No Farting sign won this round.",
+        gym: "The gym asked for one sit-up. Lance offered a hug instead.",
+        seagull: "A seagull wanted leftovers. Lance shared… with his forehead.",
+        sign: "The No Farting sign asked nicely. Lance saluted and sat this one out.",
       };
-      this.die(reasons[kind] || "Bonk.");
+      this.die(reasons[kind] || "Bonk. The buffet will keep a plate warm.");
     }
 
     onDoor(lance, item) {
-      if (this.fullness >= 0.86) {
-        this.die("Too puffy for the cabin door. Maybe skip the fountain.");
+      if (this.fullness < 0.88) return;
+      if (item.getData("bounced")) return;
+      item.setData("bounced", true);
+      const now = this.time.now;
+      const inGrace = now < this.doorGraceUntil;
+      if (!this.firstDoorBounced || inGrace) {
+        this.firstDoorBounced = true;
+        this.doorGraceUntil = Math.max(this.doorGraceUntil, now + DOOR_GRACE_MS);
+        this.puffyWarnUntil = now + DOOR_GRACE_MS;
+        this.bounceDoor(item);
+        this.flashWarn("Too full — toot to shrink!", 2800);
+        return;
       }
+      this.die("Too puffy for the cabin door. A polite toot and he'll slip right through.");
+    }
+
+    bounceDoor(item) {
+      this.lance.setVelocityY(-80);
+      this.lance.x = Math.max(170, this.lance.x - 48);
+      if (item && item.body) item.setVelocityX(-(this.scroll + 8));
+      AudioKit.beep("oof");
     }
 
     floatLabel(x, y, text) {
       const t = this.add.text(x, y, text, {
         fontFamily: "Trebuchet MS, sans-serif",
-        fontSize: "22px",
+        fontSize: "24px",
         color: "#fff4c2",
         stroke: "#222",
         strokeThickness: 4,
@@ -508,48 +732,95 @@
     }
 
     applyLanceLook() {
-      const f = Phaser.Math.Clamp(this.fullness, 0, 1.18);
+      const f = Phaser.Math.Clamp(this.fullness, 0, 1.16);
       let key = "idleInflated";
       if (this.eatFlash > 0) key = "eatLance";
       else if (this.jetting) key = "fartBlast";
-      else if (f < 0.42) key = "idleDeflated";
+      else if (f < 0.38) key = "idleDeflated";
       if (this.lance.texture.key !== key) this.lance.setTexture(key);
 
-      const t = Phaser.Math.Clamp(f / 1.0, 0, 1);
-      const sx = Phaser.Math.Linear(1.55, 0.92, t);
-      const sy = Phaser.Math.Linear(0.38, 1.08, t);
-      const over = Math.max(0, f - 1);
-      this.lance.setScale(sx + over * 0.35, sy + over * 0.28);
-      if (this.dive) this.lance.scaleY *= 0.86;
+      const t = Phaser.Math.Clamp(f, 0, 1);
+      const over = Math.max(0, f - 0.88);
+      let sx;
+      let sy;
+      if (key === "idleDeflated") {
+        sx = 0.58;
+        sy = 0.7;
+      } else {
+        sx = Phaser.Math.Linear(0.46, 0.58, t) + over * 0.22;
+        sy = Phaser.Math.Linear(0.46, 0.6, t) + over * 0.18;
+      }
+      if (this.squashFlash > 0) {
+        sx *= 1.18;
+        sy *= 0.74;
+      }
+      if (this.dive) sy *= 0.86;
+      this.lance.setScale(sx, sy);
 
-      const bw = 160 + t * 80 + over * 70;
-      const bh = 70 + t * 150 + over * 40;
+      const bw = 88 + t * 46 + over * 36;
+      const bh = 64 + t * 58 + over * 28;
       this.lance.body.setSize(bw, bh);
       this.lance.body.setOffset((this.lance.width - bw) / 2, (this.lance.height - bh) / 2);
 
       const meterT = Phaser.Math.Clamp(f, 0, 1);
-      this.meterFill.width = 352 * meterT;
-      this.meterFill.setFillStyle(f > 1 ? 0xff5b7a : f < 0.28 ? 0xf0d35a : 0x7ad36a);
+      this.meterFill.width = 504 * Math.max(0.04, meterT);
+      this.meterFill.setFillStyle(f > 0.88 ? 0xff5b7a : f < 0.2 ? 0xf0d35a : 0x7ad36a);
+      this.meterLabel.setText("BUFFET FUEL");
+      if (f > 0.88 && !this.shownPuffyHint) {
+        this.shownPuffyHint = true;
+        this.flashWarn("Too full — toot to shrink!", 2600);
+      }
+    }
+
+    magnetFoods(dt) {
+      this.foods.children.iterate((food) => {
+        if (!food || !food.active) return;
+        const dx = this.lance.x - food.x;
+        const dy = this.lance.y - food.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < FOOD_MAGNET && dist > 8) {
+          const pull = ((FOOD_MAGNET - dist) / FOOD_MAGNET) * 210 * (dt / 1000);
+          food.x += (dx / dist) * pull;
+          food.y += (dy / dist) * pull;
+        }
+      });
+    }
+
+    softBounds() {
+      if (this.lance.y > FLOOR_Y) {
+        this.lance.y = FLOOR_Y;
+        const vy = this.lance.body.velocity.y;
+        this.lance.setVelocityY(vy > 40 ? -vy * 0.3 : Math.min(vy, 0));
+      }
+      if (this.lance.y < CEIL_Y) {
+        this.lance.y = CEIL_Y;
+        const vy = this.lance.body.velocity.y;
+        this.lance.setVelocityY(vy < -40 ? -vy * 0.3 : Math.max(vy, 0));
+      }
+      this.lance.x += (LANCE_X - this.lance.x) * 0.08;
+      this.lance.setVelocityX(0);
     }
 
     update(_t, dt) {
       if (this.dead) return;
+      this.runMs += dt;
+      this.invuln = Math.max(0, this.invuln - dt);
 
       const spaceDown = this.cursors.space.isDown;
-      if (Phaser.Input.Keyboard.JustDown(this.cursors.space)) this.shortToot();
+      if (spaceDown) this.holdToot = true;
       if (spaceDown || this.holdToot) this.holdJet(dt);
       else this.jetting = this.eatFlash > 0 ? this.jetting : false;
-      if (Phaser.Input.Keyboard.JustDown(this.cursors.s) || Phaser.Input.Keyboard.JustDown(this.cursors.down)) {
-        this.doDive();
-      }
 
       this.eatFlash = Math.max(0, this.eatFlash - dt);
-      this.comboTimer -= dt;
-      if (this.comboTimer <= 0) this.combo = 0;
+      this.squashFlash = Math.max(0, this.squashFlash - dt);
 
-      this.scroll = 220 + this.distance * 0.012;
+      const targetY = 348 + Math.sin(this.runMs / 520) * 22;
+      this.lance.body.velocity.y += (targetY - this.lance.y) * 0.055;
+
+      const ramp = Math.min(92, this.runMs / 1000 * 1.15);
+      this.scroll = 86 + ramp;
       this.distance += (this.scroll * dt) / 1000;
-      this.score += dt * 0.02;
+      this.score += dt * 0.018;
 
       const wrapPair = (a, b) => {
         if (a.x <= -W) a.x = b.x + W;
@@ -568,21 +839,41 @@
       wrapPair(this.bg1, this.bg2);
       wrapPair(this.rail1, this.rail2);
 
+      this.magnetFoods(dt);
+      this.softBounds();
       this.applyLanceLook();
       this.sweep(this.foods);
       this.sweep(this.hazards);
       this.sweep(this.pickups);
       this.sweep(this.doors);
 
-      this.scoreText.setText(`Score ${Math.floor(this.score)}   ·   ${Math.floor(this.distance)}m`);
-      this.comboText.setText(this.combo > 1 ? `Toot combo x${this.combo}` : "");
+      if (this.invuln > 0) this.lance.setAlpha(0.55 + 0.45 * Math.sin(this.runMs / 40));
+      else this.lance.setAlpha(1);
 
-      if (this.fullness <= 0.02) this.die("Pancake whale. Time for seconds?");
+      this.scoreText.setText(`Score ${Math.floor(this.score)}`);
+      this.syncScrollVelocities();
+    }
+
+    itemSpeed() {
+      return -(this.scroll + 128);
+    }
+
+    syncScrollVelocities() {
+      const vx = this.itemSpeed();
+      const setVx = (group) => {
+        group.children.iterate((child) => {
+          if (child && child.body) child.setVelocityX(vx);
+        });
+      };
+      setVx(this.foods);
+      setVx(this.hazards);
+      setVx(this.pickups);
+      setVx(this.doors);
     }
 
     sweep(group) {
       group.children.iterate((child) => {
-        if (child && child.x < -160) child.destroy();
+        if (child && child.x < -180) child.destroy();
       });
     }
 
@@ -597,12 +888,14 @@
       this.pickups.setVelocityX(0);
       this.doors.setVelocityX(0);
 
+      const prevLast = loadScores().last;
       const run = {
         score: Math.floor(this.score),
         distance: Math.floor(this.distance),
         toots: this.tootCount,
         studs: this.studs,
         reason,
+        prevLast: prevLast ? prevLast.score : null,
       };
       saveRun(run);
       this.scene.launch("over", run);
@@ -615,34 +908,35 @@
     }
     create(run) {
       this.add.rectangle(W / 2, H / 2, W, H, 0x041824, 0.55).setInteractive();
-      const panel = this.add.rectangle(W / 2, H / 2, 640, 460, 0x123a52, 0.94).setStrokeStyle(5, 0xffe08a);
-      this.add.text(W / 2, 200, "GAME OVER", {
+      this.add.rectangle(W / 2, H / 2, 680, 500, 0x123a52, 0.94).setStrokeStyle(5, 0xffe08a);
+      this.add.text(W / 2, 188, "GAME OVER", {
         fontFamily: "Impact, Georgia, serif",
         fontSize: "56px",
         color: "#fff2c4",
       }).setOrigin(0.5);
-      this.add.text(W / 2, 262, run.reason, {
+      this.add.text(W / 2, 252, run.reason, {
         fontFamily: "Georgia, serif",
         fontSize: "24px",
         color: "#ffe7d0",
         align: "center",
-        wordWrap: { width: 560 },
+        wordWrap: { width: 600 },
       }).setOrigin(0.5);
 
       const { best } = loadScores();
       const hi = run.score >= best && run.score > 0 ? "  ★ new best!" : "";
-      this.add.text(W / 2, 350, `Score ${run.score}${hi}\nBest ${best}\n${run.distance}m  ·  ${run.toots} toots  ·  ${run.studs} studs`, {
+      const lastLine = run.prevLast == null ? "Last — first cruise!" : `Last ${run.prevLast}`;
+      this.add.text(W / 2, 350, `Score ${run.score}${hi}\nBest ${best}\n${lastLine}`, {
         fontFamily: "Trebuchet MS, sans-serif",
-        fontSize: "22px",
+        fontSize: "26px",
         color: "#e8f6ff",
         align: "center",
-        lineSpacing: 6,
+        lineSpacing: 8,
       }).setOrigin(0.5);
 
-      const retry = this.add.rectangle(W / 2 - 130, 470, 220, 64, 0xe31c3d).setStrokeStyle(3, 0xfff1b0).setInteractive({ useHandCursor: true });
-      this.add.text(W / 2 - 130, 470, "RETRY", { fontFamily: "Impact, sans-serif", fontSize: "32px", color: "#fff8e0" }).setOrigin(0.5);
-      const title = this.add.rectangle(W / 2 + 130, 470, 220, 64, 0x1b6b8a).setStrokeStyle(3, 0xfff1b0).setInteractive({ useHandCursor: true });
-      this.add.text(W / 2 + 130, 470, "TITLE", { fontFamily: "Impact, sans-serif", fontSize: "32px", color: "#fff8e0" }).setOrigin(0.5);
+      const retry = this.add.rectangle(W / 2 - 140, 478, 240, 72, 0xe31c3d).setStrokeStyle(4, 0xfff1b0).setInteractive({ useHandCursor: true });
+      this.add.text(W / 2 - 140, 478, "RETRY", { fontFamily: "Impact, sans-serif", fontSize: "36px", color: "#fff8e0" }).setOrigin(0.5);
+      const title = this.add.rectangle(W / 2 + 140, 478, 240, 72, 0x1b6b8a).setStrokeStyle(4, 0xfff1b0).setInteractive({ useHandCursor: true });
+      this.add.text(W / 2 + 140, 478, "TITLE", { fontFamily: "Impact, sans-serif", fontSize: "36px", color: "#fff8e0" }).setOrigin(0.5);
 
       const goRetry = () => {
         this.scene.stop("over");
@@ -675,7 +969,7 @@
     },
     physics: {
       default: "arcade",
-      arcade: { gravity: { y: 760 }, fps: 60, debug: false },
+      arcade: { gravity: { y: 90 }, fps: 60, debug: false },
     },
     fps: { target: 60, forceSetTimeOut: false },
     scene: [BootScene, TitleScene, PlayScene, OverScene],
