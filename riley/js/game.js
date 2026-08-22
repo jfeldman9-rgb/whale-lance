@@ -10,11 +10,22 @@
   const HOLD_JET_MS = 220;
   const WAYGATE_WARN_MS = 1500;
   const TUTORIAL_MS = 6200;
-  const KICK_MAGNET = 150;
-  const MAX_TROLLOCS = 4;
-  const LIGHTNING_NEED = 0.78;
-  const WARDER_NEED = 0.54;
-  const KICK_BASE_MS = 340;
+  const MAX_FOES = 5;
+  const MAX_HP = 6;
+  const START_HP = 3;
+  const SHARDS_TO_LEVEL = [0, 3, 4];
+  const RAND_MS = 10000;
+  const WEAPONS = [
+    null,
+    { name: "FIREBALL", key: "fireball", damage: 1, speed: 560, pierce: 0, scale: 0.72, tint: 0xff8844 },
+    { name: "LIGHTNING", key: "bolt", damage: 2, speed: 720, pierce: 1, scale: 0.78, tint: 0x9fd7ff },
+    { name: "BALEFIRE", key: "balefire", damage: 4, speed: 640, pierce: 3, scale: 0.9, tint: 0xfff1b0 },
+  ];
+  const FOES = {
+    trolloc: { hp: 2, score: 40, scale: 0.78, hit: 0.7 },
+    brute: { hp: 5, score: 100, scale: 0.82, hit: 0.72 },
+    fade: { hp: 4, score: 80, scale: 0.7, hit: 0.42 },
+  };
 
   const KEYS = {
     best: "tkdRiley.best",
@@ -24,21 +35,13 @@
     seenIntro: "tkdRiley.seenIntro",
   };
 
-  const TERANGREAL = [
-    { id: "shield", label: "Air shield!", ms: 3600 },
-    { id: "slow", label: "Slow weave!", ms: 4200 },
-    { id: "fire", label: "Fire kick!", ms: 6200 },
-    { id: "hop", label: "Folded air!", ms: 5000 },
-    { id: "heal", label: "Second chance!", ms: 0 },
-  ];
-
   const JOKES = [
-    "The Wheel weaves as he kicks.",
-    "Trollocs hate homework and high kicks.",
-    "Saidin first. Then lightning.",
-    "A Warder is just a very serious spotter.",
-    "Ter'angreal: shake well before kicking.",
-    "Angreal: for when one kick is not enough.",
+    "Level 1: fireballs. Level 3: the Pattern flinches.",
+    "Trollocs have hit points now. Rude.",
+    "Shards for the weapon. Hearts for the ninja.",
+    "If the dragon ter'angreal shows up, duck and grin.",
+    "Balefire is not a toy. Riley disagrees.",
+    "The Dragon Reborn does not do homework.",
   ];
 
   function loadScores() {
@@ -157,14 +160,14 @@
       const gain = ctx.createGain();
       osc.connect(gain);
       gain.connect(ctx.destination);
-      if (kind === "kick") {
-        osc.type = "square";
-        osc.frequency.setValueAtTime(180, now);
-        osc.frequency.exponentialRampToValueAtTime(70, now + 0.12);
-        gain.gain.setValueAtTime(0.1, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+      if (kind === "kick" || kind === "fire") {
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(240, now);
+        osc.frequency.exponentialRampToValueAtTime(90, now + 0.14);
+        gain.gain.setValueAtTime(0.09, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
         osc.start(now);
-        osc.stop(now + 0.15);
+        osc.stop(now + 0.17);
       } else if (kind === "jet") {
         osc.type = "sawtooth";
         osc.frequency.setValueAtTime(90, now);
@@ -197,6 +200,14 @@
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
         osc.start(now);
         osc.stop(now + 0.2);
+      } else if (kind === "balefire") {
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(920, now);
+        osc.frequency.exponentialRampToValueAtTime(140, now + 0.26);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+        osc.start(now);
+        osc.stop(now + 0.3);
       } else if (kind === "lightning") {
         osc.type = "sawtooth";
         osc.frequency.setValueAtTime(740, now);
@@ -234,15 +245,18 @@
       });
 
       this.load.image("rileyIdle", "assets/riley-idle.png");
-      this.load.image("rileyKick", "assets/riley-kick.png");
+      this.load.image("rileyKick", "assets/riley-cast.png");
       this.load.image("rileyTitle", "assets/riley-title.png");
       this.load.image("trolloc", "assets/trolloc.png");
-      this.load.image("eye", "assets/eye-of-world.png");
-      this.load.image("terangreal", "assets/terangreal.png");
-      this.load.image("angreal", "assets/angreal.png");
-      this.load.image("warder", "assets/warder.png");
+      this.load.image("brute", "assets/trolloc-brute.png");
       this.load.image("fade", "assets/fade.png");
-      this.load.image("slash", "assets/kick-slash.png");
+      this.load.image("heart", "assets/heart-pickup.png");
+      this.load.image("shard", "assets/weapon-shard.png");
+      this.load.image("dragon", "assets/dragon-terangreal.png");
+      this.load.image("fireball", "assets/fireball.png");
+      this.load.image("bolt", "assets/lightning-bolt.png");
+      this.load.image("balefire", "assets/balefire.png");
+      this.load.image("rand", "assets/rand.png");
       this.load.image("waygate", "assets/waygate.png");
       this.load.image("bg", "assets/bg.jpg");
       this.load.image("bgFar", "assets/bg-far.jpg");
@@ -251,12 +265,16 @@
       this.load.image("intro2", "assets/intro-2.jpg");
       this.load.image("intro3", "assets/intro-3.jpg");
       this.load.image("creditsBg", "assets/credits-bg.jpg");
+      this.load.image("cut1", "assets/cutscene-dragon-1.jpg");
+      this.load.image("cut2", "assets/cutscene-dragon-2.jpg");
+      this.load.image("cut3", "assets/cutscene-dragon-3.jpg");
+      this.load.image("cut4", "assets/cutscene-dragon-4.jpg");
       this.load.on("loaderror", (file) => {
         console.warn("optional asset missed", file && file.key);
       });
     }
     create() {
-      ["rileyIdle", "rileyKick", "rileyTitle", "trolloc", "eye", "terangreal", "angreal", "warder", "fade", "slash", "waygate"]
+      ["rileyIdle", "rileyKick", "rileyTitle", "trolloc", "brute", "fade", "heart", "shard", "dragon", "fireball", "bolt", "balefire", "rand", "waygate"]
         .forEach((key) => chromaKeyTexture(this, key));
       this.scene.start(seenIntro() ? "title" : "intro");
     }
@@ -412,7 +430,7 @@
         strokeThickness: 8,
       }).setOrigin(0.5);
 
-      this.add.text(820, 236, "Tap to kick. Scatter the Trollocs. Gather the One Power.", {
+      this.add.text(820, 236, "Tap to fire. Upgrade the weapon. Call the Dragon Reborn.", {
         fontFamily: "Trebuchet MS, sans-serif",
         fontSize: "24px",
         color: "#fff6d0",
@@ -497,15 +515,18 @@
     create() {
       sweepHtmlVideos();
       this.dead = false;
-      this.saidin = 0.22;
-      this.saidar = 0.18;
+      this.cutscene = false;
+      this.hp = START_HP;
+      this.maxHp = START_HP;
+      this.weaponLevel = 1;
+      this.weaponXP = 0;
       this.distance = 0;
       this.score = 0;
-      this.kickCount = 0;
+      this.shots = 0;
       this.trollocsDown = 0;
       this.holdBoost = false;
-      this.kicking = false;
-      this.kickUntil = 0;
+      this.casting = false;
+      this.castUntil = 0;
       this.dive = false;
       this.scroll = 86;
       this.pointerDownAt = 0;
@@ -513,8 +534,7 @@
       this.jetSfx = 0;
       this.runMs = 0;
       this.didTap = false;
-      this.didKickEnemy = false;
-      this.freeHitUsed = false;
+      this.didHit = false;
       this.invuln = SAFE_MS;
       this.gateWarned = false;
       this.gateWarnUntil = 0;
@@ -522,15 +542,10 @@
       this.shownTrollocPrompt = false;
       this.showTutorial = !hasLearned();
       this.foodLane = 0;
-      this.kickSpeed = 1;
-      this.fireKick = 0;
-      this.slowWeave = 0;
-      this.hopBoost = 0;
-      this.shieldMs = 0;
-      this.warderOn = false;
-      this.warderKickAt = 0;
-      this.lightningFlash = 0;
-      this.lightningArmed = false;
+      this.randUntil = 0;
+      this.randClearAt = 0;
+      this.dragonUsed = false;
+      this.fireCool = 0;
 
       this.bgFar1 = this.add.image(0, H / 2, "bgFar").setOrigin(0, 0.5).setDisplaySize(W, H);
       this.bgFar2 = this.add.image(W, H / 2, "bgFar").setOrigin(0, 0.5).setDisplaySize(W, H);
@@ -543,6 +558,7 @@
       this.hazards = this.physics.add.group();
       this.pickups = this.physics.add.group();
       this.gates = this.physics.add.group();
+      this.shotsGroup = this.physics.add.group();
 
       this.riley = this.physics.add.image(RILEY_X, 350, "rileyIdle");
       this.riley.body.allowGravity = true;
@@ -552,28 +568,37 @@
       this.physics.world.gravity.y = 90;
       window.TkdRiley = { play: this };
 
-      this.warder = this.add.image(RILEY_X - 110, 360, "warder").setScale(0.52).setDepth(7).setAlpha(0);
-      this.warderKickPose = false;
+      this.rand = this.add.image(RILEY_X + 90, 320, "rand").setScale(0.58).setDepth(9).setAlpha(0);
 
-      this.physics.add.overlap(this.riley, this.trollocs, this.onTrolloc, null, this);
-      this.physics.add.overlap(this.riley, this.hazards, this.onHazard, null, this);
+      this.physics.add.overlap(this.riley, this.trollocs, this.onFoeTouch, null, this);
+      this.physics.add.overlap(this.riley, this.hazards, this.onFoeTouch, null, this);
       this.physics.add.overlap(this.riley, this.pickups, this.onPickup, null, this);
       this.physics.add.overlap(this.riley, this.gates, this.onGate, null, this);
+      this.physics.add.overlap(this.shotsGroup, this.trollocs, this.onShotHit, null, this);
+      this.physics.add.overlap(this.shotsGroup, this.hazards, this.onShotHit, null, this);
 
-      this.scoreText = this.add.text(28, 18, "Score 0", {
+      this.scoreText = this.add.text(28, 14, "Score 0", {
         fontFamily: "Impact, Trebuchet MS, sans-serif",
-        fontSize: "40px",
+        fontSize: "36px",
         color: "#fff8dc",
         stroke: "#123",
         strokeThickness: 6,
       }).setDepth(20);
 
+      this.heartText = this.add.text(28, 58, "", {
+        fontFamily: "Impact, sans-serif",
+        fontSize: "28px",
+        color: "#ff6b7a",
+        stroke: "#3a1010",
+        strokeThickness: 4,
+      }).setDepth(20);
+
       this.meterBack = this.add.rectangle(W / 2, 42, 520, 40, 0x173246).setStrokeStyle(4, 0xfff1b0).setDepth(20);
-      this.meterFill = this.add.rectangle(W / 2 - 252, 42, 504, 28, 0x6ec8ff).setOrigin(0, 0.5).setDepth(21);
-      this.meterLabel = this.add.text(W / 2, 42, "SAIDIN", {
+      this.meterFill = this.add.rectangle(W / 2 - 252, 42, 504, 28, 0xff7a3a).setOrigin(0, 0.5).setDepth(21);
+      this.meterLabel = this.add.text(W / 2, 42, "FIREBALL", {
         fontFamily: "Impact, sans-serif",
         fontSize: "26px",
-        color: "#14301c",
+        color: "#1a1208",
       }).setOrigin(0.5).setDepth(22);
 
       this.warnText = this.add.text(W / 2, 92, "", {
@@ -615,6 +640,8 @@
         paused: true,
       });
 
+      this.cutLayer = this.add.container(0, 0).setDepth(50).setVisible(false);
+
       if (this.showTutorial) this.startTapTutorial();
 
       this.cursors = this.input.keyboard.addKeys({
@@ -627,7 +654,7 @@
         if (this.spaceHeld) return;
         this.spaceHeld = true;
         this.pointerDownAt = this.time.now;
-        this.kick();
+        this.fire();
       });
       this.input.keyboard.on("keyup-SPACE", () => {
         this.spaceHeld = false;
@@ -637,12 +664,12 @@
       this.input.keyboard.on("keydown-DOWN", () => this.doDive());
 
       this.input.on("pointerdown", (p) => {
-        if (this.dead) return;
+        if (this.dead || this.cutscene) return;
         if (p.y < 80 && p.x > W - 100) return;
         this.pointerDownAt = this.time.now;
         this.swipeStart = { x: p.x, y: p.y, t: this.time.now };
         this.holdBoost = true;
-        this.kick();
+        this.fire();
       });
       this.input.on("pointerup", (p) => {
         this.holdBoost = false;
@@ -655,10 +682,11 @@
 
       this.time.addEvent({ delay: 1180, loop: true, callback: () => this.spawnWave() });
       this.applyRileyLook();
+      this.refreshHUD();
     }
 
     startTapTutorial() {
-      this.prompt.setText("TAP TO KICK").setAlpha(1);
+      this.prompt.setText("TAP TO FIRE").setAlpha(1);
       this.finger.setAlpha(1);
       this.fingerTween.play();
       this.tweens.add({
@@ -669,7 +697,7 @@
         repeat: 6,
       });
       this.time.delayedCall(TUTORIAL_MS, () => {
-        if (this.prompt.text === "TAP TO KICK") this.fadePrompt();
+        if (this.prompt.text === "TAP TO FIRE") this.fadePrompt();
         this.tweens.add({
           targets: this.finger,
           alpha: 0,
@@ -685,17 +713,9 @@
 
     flashPrompt(text, holdMs = 2200) {
       if (this.dead || !this.showTutorial) return;
-      if (this.runMs < TUTORIAL_MS && text !== "TAP TO KICK") {
+      if (this.runMs < TUTORIAL_MS && text !== "TAP TO FIRE") {
         this.time.delayedCall(TUTORIAL_MS - this.runMs + 80, () => this.flashPrompt(text, holdMs));
         return;
-      }
-      if (text !== "TAP TO KICK") {
-        this.tweens.add({
-          targets: this.finger,
-          alpha: 0,
-          duration: 240,
-          onComplete: () => this.fingerTween.pause(),
-        });
       }
       this.prompt.setText(text).setAlpha(1).setScale(1);
       this.tweens.add({
@@ -726,36 +746,39 @@
       });
     }
 
-    power() {
-      return (this.saidin + this.saidar) * 0.5;
-    }
-
-    kickDuration() {
-      const fire = this.fireKick > 0 ? 1.25 : 1;
-      return KICK_BASE_MS * this.kickSpeed * fire;
-    }
-
-    kick() {
-      if (this.dead) return;
+    fire() {
+      if (this.dead || this.cutscene) return;
       this.didTap = true;
       this.maybeLearn();
-      if (this.lightningArmed || this.saidin >= LIGHTNING_NEED) {
-        this.castLightning();
+      const hop = 1;
+      this.riley.setVelocityY(-250 * hop);
+      this.casting = true;
+      this.castUntil = this.time.now + 280;
+      if (this.fireCool <= 0) {
+        this.spawnShot();
+        this.fireCool = this.weaponLevel >= 3 ? 160 : this.weaponLevel === 2 ? 200 : 240;
       }
-      const hop = this.hopBoost > 0 ? 1.28 : 1;
-      this.riley.setVelocityY(-270 * hop);
-      this.kicking = true;
-      this.kickUntil = this.time.now + this.kickDuration();
-      this.kickCount += 1;
-      this.kickSlash();
-      AudioKit.beep("kick");
+    }
+
+    spawnShot() {
+      const spec = WEAPONS[this.weaponLevel] || WEAPONS[1];
+      const shot = this.shotsGroup.create(this.riley.x + 90, this.riley.y - 10, spec.key);
+      shot.setScale(spec.scale);
+      shot.body.allowGravity = false;
+      shot.setVelocityX(spec.speed);
+      shot.setVelocityY(0);
+      shot.setDepth(10);
+      shot.setData("damage", spec.damage);
+      shot.setData("pierce", spec.pierce);
+      shot.setData("hits", 0);
+      this.shots += 1;
+      AudioKit.beep(this.weaponLevel >= 3 ? "balefire" : this.weaponLevel === 2 ? "lightning" : "fire");
     }
 
     holdJet(dt) {
-      if (this.dead) return;
+      if (this.dead || this.cutscene) return;
       if (this.time.now - this.pointerDownAt < HOLD_JET_MS) return;
-      const hop = this.hopBoost > 0 ? 1.2 : 1;
-      this.riley.setVelocityY(this.riley.body.velocity.y - 980 * hop * (dt / 1000));
+      this.riley.setVelocityY(this.riley.body.velocity.y - 980 * (dt / 1000));
       this.jetSfx -= dt;
       if (this.jetSfx <= 0) {
         AudioKit.beep("jet");
@@ -764,114 +787,42 @@
     }
 
     doDive() {
-      if (this.dead) return;
+      if (this.dead || this.cutscene) return;
       this.riley.setVelocityY(Math.max(this.riley.body.velocity.y, 0) + 280);
       this.dive = true;
-      this.kicking = true;
-      this.kickUntil = Math.max(this.kickUntil, this.time.now + 220);
       this.time.delayedCall(180, () => { this.dive = false; });
     }
 
-    addSaidin(n) {
-      this.saidin = Math.min(1, this.saidin + n);
-    }
-
-    addSaidar(n) {
-      this.saidar = Math.min(1, this.saidar + n);
-    }
-
     maybeLearn() {
-      if (this.didTap && this.didKickEnemy) markLearned();
-    }
-
-    kickSlash() {
-      const slash = this.add.image(this.riley.x + 120, this.riley.y + 10, "slash")
-        .setScale(this.fireKick > 0 ? 1.15 : 0.82)
-        .setAlpha(0.92)
-        .setDepth(9)
-        .setTint(this.fireKick > 0 ? 0xff8844 : 0xfff1b0);
-      this.tweens.add({
-        targets: slash,
-        x: slash.x + 90,
-        alpha: 0,
-        scale: 1.25,
-        duration: 280,
-        onComplete: () => slash.destroy(),
-      });
-    }
-
-    castLightning() {
-      this.lightningArmed = false;
-      this.lightningFlash = 420;
-      this.saidin = Math.max(0.16, this.saidin - 0.62);
-      this.saidar = Math.max(0.12, this.saidar - 0.18);
-      AudioKit.beep("lightning");
-      this.cameras.main.flash(220, 220, 240, 255);
-      this.cameras.main.shake(180, 0.006);
-      this.flashWarn("Callandor crackles!", 1600);
-      let n = 0;
-      const zap = (group) => {
-        group.children.iterate((child) => {
-          if (!child || !child.active) return;
-          n += 1;
-          this.drawBolt(this.riley.x + 40, this.riley.y - 20, child.x, child.y);
-          child.destroy();
-        });
-      };
-      zap(this.trollocs);
-      zap(this.hazards);
-      this.trollocsDown += n;
-      this.score += n * 40 + 80;
-      this.floatLabel(this.riley.x, this.riley.y - 90, `LIGHTNING ×${n}`);
-    }
-
-    drawBolt(x1, y1, x2, y2) {
-      const g = this.add.graphics().setDepth(18);
-      g.lineStyle(4, 0xfff6b0, 1);
-      g.beginPath();
-      g.moveTo(x1, y1);
-      const steps = 6;
-      for (let i = 1; i <= steps; i += 1) {
-        const t = i / steps;
-        g.lineTo(
-          x1 + (x2 - x1) * t + Phaser.Math.Between(-18, 18),
-          y1 + (y2 - y1) * t + Phaser.Math.Between(-12, 12),
-        );
-      }
-      g.strokePath();
-      this.tweens.add({
-        targets: g,
-        alpha: 0,
-        duration: 280,
-        onComplete: () => g.destroy(),
-      });
+      if (this.didTap && this.didHit) markLearned();
     }
 
     spawnWave() {
-      if (this.dead) return;
+      if (this.dead || this.cutscene) return;
       const safe = this.runMs < SAFE_MS;
       const y = this.nextLaneY();
-      const trollN = this.trollocs.countActive(true);
+      const foeN = this.trollocs.countActive(true) + this.hazards.countActive(true);
 
       if (safe) {
-        if (trollN < MAX_TROLLOCS) this.spawnTrolloc(y);
+        if (foeN < MAX_FOES) this.spawnFoe("trolloc", y);
         return;
       }
 
       const roll = Math.random();
-      if (roll < 0.58) {
-        if (trollN < MAX_TROLLOCS) this.spawnTrolloc(y);
-      } else if (roll < 0.7) {
-        this.spawnItem(this.pickups, "eye", y, 0.92, { hit: 1.05 });
+      if (roll < 0.5) {
+        if (foeN < MAX_FOES) this.spawnFoe("trolloc", y);
+      } else if (roll < 0.62) {
+        if (foeN < MAX_FOES) this.spawnFoe("brute", y);
+      } else if (roll < 0.72) {
+        if (foeN < MAX_FOES) this.spawnFoe("fade", Phaser.Math.Between(200, 460));
+      } else if (roll < 0.84) {
+        this.spawnItem(this.pickups, "heart", y, 0.88, { hit: 1.05 });
         this.maybePowerPrompt();
-      } else if (roll < 0.8) {
-        this.spawnItem(this.pickups, "terangreal", Phaser.Math.Between(220, 480), 0.88, { hit: 1.05 });
+      } else if (roll < 0.95) {
+        this.spawnItem(this.pickups, "shard", Phaser.Math.Between(220, 480), 0.88, { hit: 1.05 });
         this.maybePowerPrompt();
-      } else if (roll < 0.88) {
-        this.spawnItem(this.pickups, "angreal", Phaser.Math.Between(220, 480), 0.9, { hit: 1.05 });
-        this.maybePowerPrompt();
-      } else if (roll < 0.94) {
-        this.spawnItem(this.hazards, "fade", Phaser.Math.Between(200, 460), 0.72, { hit: 0.42 });
+      } else if (!this.dragonUsed && this.runMs > 14000) {
+        this.spawnItem(this.pickups, "dragon", Phaser.Math.Between(240, 420), 0.92, { hit: 1.1 });
       } else {
         this.spawnItem(this.gates, "waygate", Phaser.Math.Between(280, 470), 0.7, { hit: 0.36 });
       }
@@ -883,11 +834,18 @@
       return Phaser.Math.Clamp(lanes[this.foodLane] + Phaser.Math.Between(-24, 24), 170, 560);
     }
 
-    spawnTrolloc(y) {
-      const item = this.spawnItem(this.trollocs, "trolloc", y, 0.78, { hit: 0.72 });
+    spawnFoe(kind, y) {
+      const spec = FOES[kind];
+      const group = kind === "fade" ? this.hazards : this.trollocs;
+      const item = this.spawnItem(group, kind, y, spec.scale, { hit: spec.hit });
+      item.setData("hp", spec.hp);
+      item.setData("maxHp", spec.hp);
+      item.setData("score", spec.score);
+      const bar = this.add.rectangle(item.x, item.y - 70, 64, 8, 0xff4b4b).setDepth(12);
+      item.setData("hpBar", bar);
       if (this.showTutorial && !this.shownTrollocPrompt) {
         this.shownTrollocPrompt = true;
-        this.flashPrompt("KICK THE TROLLOCS", 2600);
+        this.flashPrompt("BLAST THE TROLLOCS", 2600);
       }
       return item;
     }
@@ -895,7 +853,7 @@
     maybePowerPrompt() {
       if (this.showTutorial && !this.shownPowerPrompt) {
         this.shownPowerPrompt = true;
-        this.flashPrompt("GRAB THE ONE POWER", 2600);
+        this.flashPrompt("HEARTS HEAL  ·  SHARDS UPGRADE", 2800);
       }
     }
 
@@ -913,103 +871,195 @@
       return item;
     }
 
-    canStrike() {
-      return this.kicking || this.lightningFlash > 0 || this.warderKickPose;
+    onShotHit(shot, foe) {
+      if (!shot.active || !foe.active) return;
+      const dmg = shot.getData("damage") || 1;
+      const pierce = shot.getData("pierce") || 0;
+      const hits = (shot.getData("hits") || 0) + 1;
+      shot.setData("hits", hits);
+      this.hurtFoe(foe, dmg);
+      if (hits > pierce) shot.destroy();
     }
 
-    onTrolloc(_riley, item) {
-      if (this.canStrike()) {
-        this.defeatEnemy(item, 50, "KIAI!");
-        return;
-      }
-      this.takeHit(item, "A Trolloc wanted a hug. Riley offered a forehead.");
-    }
-
-    onHazard(_riley, item) {
-      if (this.canStrike() && this.kicking) {
-        this.defeatEnemy(item, 90, "Fade down!");
-        return;
-      }
-      this.takeHit(item, "The Fade asked for silence. Riley answered with a kick… almost.");
-    }
-
-    defeatEnemy(item, points, label) {
-      item.destroy();
-      this.trollocsDown += 1;
-      this.score += points;
-      this.addSaidin(0.035);
-      this.didKickEnemy = true;
+    hurtFoe(foe, dmg) {
+      const hp = (foe.getData("hp") || 1) - dmg;
+      foe.setData("hp", hp);
+      this.didHit = true;
       this.maybeLearn();
       AudioKit.beep("hit");
-      this.floatLabel(this.riley.x, this.riley.y - 70, label);
+      foe.setTint(0xffe0a0);
+      this.time.delayedCall(80, () => { if (foe.active) foe.clearTint(); });
+      this.floatLabel(foe.x, foe.y - 60, `-${dmg}`);
+      if (hp <= 0) {
+        this.trollocsDown += 1;
+        this.score += foe.getData("score") || 40;
+        const bar = foe.getData("hpBar");
+        if (bar && bar.destroy) bar.destroy();
+        foe.destroy();
+      }
+    }
+
+    onFoeTouch(_riley, item) {
+      if (this.randUntil > this.time.now) {
+        this.hurtFoe(item, 99);
+        return;
+      }
+      this.takeHit(item, item.getData("kind") === "fade"
+        ? "The Fade asked for silence. Riley answered with a fireball… almost."
+        : "A Trolloc wanted a hug. Riley offered a forehead.");
     }
 
     takeHit(item, reason) {
-      if (this.invuln > 0 || this.shieldMs > 0) {
-        if (this.shieldMs > 0 && item && item.active) item.destroy();
-        return;
+      if (this.invuln > 0 || this.cutscene) return;
+      if (item && item.active) {
+        const bar = item.getData("hpBar");
+        if (bar && bar.destroy) bar.destroy();
+        item.destroy();
       }
-      if (item && item.active) item.destroy();
-      if (!this.freeHitUsed) {
-        this.freeHitUsed = true;
-        this.invuln = 1400;
-        this.riley.setVelocityY(-180);
-        this.riley.x = Math.max(180, this.riley.x - 36);
-        this.floatLabel(this.riley.x, this.riley.y - 60, "oof");
-        this.flashWarn("oof — still kicking!", 1600);
-        this.cameras.main.flash(180, 255, 230, 180);
-        AudioKit.beep("oof");
-        return;
-      }
-      this.die(reason);
+      this.hp -= 1;
+      this.invuln = 1200;
+      this.riley.setVelocityY(-180);
+      this.riley.x = Math.max(180, this.riley.x - 36);
+      this.floatLabel(this.riley.x, this.riley.y - 60, "oof");
+      this.flashWarn(this.hp > 0 ? `oof — ${this.hp} heart${this.hp === 1 ? "" : "s"} left!` : "Last weave missed.", 1600);
+      this.cameras.main.flash(180, 255, 230, 180);
+      AudioKit.beep("oof");
+      this.refreshHUD();
+      if (this.hp <= 0) this.die(reason);
     }
 
     onPickup(_riley, item) {
       const kind = item.getData("kind");
       item.destroy();
       AudioKit.beep("power");
-      if (kind === "eye") {
-        this.addSaidin(0.3);
-        this.addSaidar(0.3);
-        this.score += 80;
-        this.floatLabel(this.riley.x, this.riley.y - 80, "Eye of the World!");
-        this.flashWarn("Pure saidin and saidar!", 1800);
-      } else if (kind === "angreal") {
-        this.kickSpeed = Math.min(2.15, this.kickSpeed + 0.22);
-        this.addSaidin(0.08);
-        this.score += 60;
-        this.floatLabel(this.riley.x, this.riley.y - 80, "Angreal — faster kicks!");
-      } else if (kind === "terangreal") {
-        this.score += 55;
-        this.addSaidar(0.1);
-        this.rollTerangreal();
+      if (kind === "heart") {
+        if (this.hp < MAX_HP) {
+          this.hp += 1;
+          this.maxHp = Math.max(this.maxHp, this.hp);
+        }
+        this.score += 40;
+        this.floatLabel(this.riley.x, this.riley.y - 80, "+1 HEART");
+        this.flashWarn("Riley's health rises!", 1400);
+      } else if (kind === "shard") {
+        this.addWeaponXP(1);
+        this.score += 50;
+      } else if (kind === "dragon") {
+        this.score += 200;
+        this.startDragonCutscene();
+      }
+      this.refreshHUD();
+    }
+
+    addWeaponXP(n) {
+      if (this.weaponLevel >= 3) {
+        this.floatLabel(this.riley.x, this.riley.y - 80, "Balefire is already singing.");
+        return;
+      }
+      this.weaponXP += n;
+      const need = SHARDS_TO_LEVEL[this.weaponLevel] || 3;
+      this.floatLabel(this.riley.x, this.riley.y - 80, `WEAPON ${this.weaponXP}/${need}`);
+      if (this.weaponXP >= need) {
+        this.weaponXP = 0;
+        this.weaponLevel += 1;
+        const name = WEAPONS[this.weaponLevel].name;
+        this.flashWarn(`Weapon up! ${name}!`, 2000);
+        this.cameras.main.flash(200, 255, 230, 160);
       }
     }
 
-    rollTerangreal() {
-      const pick = Phaser.Utils.Array.GetRandom(TERANGREAL);
-      this.floatLabel(this.riley.x, this.riley.y - 80, pick.label);
-      if (pick.id === "shield") {
-        this.shieldMs = pick.ms;
-        this.invuln = Math.max(this.invuln, pick.ms);
-        this.flashWarn("Air shield holds!", 1600);
-      } else if (pick.id === "slow") {
-        this.slowWeave = pick.ms;
-        this.flashWarn("The Pattern slows…", 1600);
-      } else if (pick.id === "fire") {
-        this.fireKick = pick.ms;
-        this.flashWarn("Kicks burn brighter!", 1600);
-      } else if (pick.id === "hop") {
-        this.hopBoost = pick.ms;
-        this.flashWarn("Folded air underfoot!", 1600);
-      } else if (pick.id === "heal") {
-        this.freeHitUsed = false;
-        this.flashWarn("The Power mends a bruise.", 1600);
+    startDragonCutscene() {
+      if (this.dragonUsed || this.cutscene) return;
+      this.dragonUsed = true;
+      this.cutscene = true;
+      this.riley.setVelocity(0, 0);
+      this.trollocs.setVelocityX(0);
+      this.hazards.setVelocityX(0);
+      this.pickups.setVelocityX(0);
+      this.gates.setVelocityX(0);
+      this.shotsGroup.setVelocityX(0);
+
+      this.cutLayer.removeAll(true);
+      this.cutLayer.setVisible(true);
+      const frames = ["cut1", "cut2", "cut3", "cut4"].filter((k) => this.textures.exists(k));
+      const img = this.add.image(W / 2, H / 2, frames[0] || "bg").setDisplaySize(W, H);
+      const cap = this.add.text(W / 2, H - 70, "The dragon ter'angreal answers…", {
+        fontFamily: "Georgia, serif",
+        fontSize: "32px",
+        color: "#fff4c8",
+        stroke: "#120818",
+        strokeThickness: 6,
+      }).setOrigin(0.5);
+      const skip = this.add.text(W - 28, 22, "SKIP", {
+        fontFamily: "Impact, sans-serif",
+        fontSize: "28px",
+        color: "#fff8e0",
+        stroke: "#123",
+        strokeThickness: 5,
+      }).setOrigin(1, 0).setInteractive({ useHandCursor: true });
+      this.cutLayer.add([img, cap, skip]);
+      let i = 0;
+      const captions = [
+        "The dragon ter'angreal answers…",
+        "A redhead steps out of the Light.",
+        "The Dragon Reborn stands with Riley.",
+        "THE DRAGON REBORN",
+      ];
+      const ev = this.time.addEvent({
+        delay: 1400,
+        repeat: Math.max(0, frames.length - 1),
+        callback: () => {
+          i += 1;
+          if (i < frames.length) {
+            img.setTexture(frames[i]).setDisplaySize(W, H);
+            cap.setText(captions[i] || "");
+          } else {
+            this.endDragonCutscene();
+          }
+        },
+      });
+      const finish = () => {
+        ev.remove(false);
+        this.endDragonCutscene();
+      };
+      skip.on("pointerdown", (p) => {
+        if (p.event && p.event.stopPropagation) p.event.stopPropagation();
+        finish();
+      });
+      this.input.keyboard.once("keydown-SPACE", finish);
+    }
+
+    endDragonCutscene() {
+      if (!this.cutscene) return;
+      this.cutscene = false;
+      this.cutLayer.setVisible(false);
+      this.cutLayer.removeAll(true);
+      this.randUntil = this.time.now + RAND_MS;
+      this.tweens.add({ targets: this.rand, alpha: 1, duration: 280 });
+      this.flashWarn("The Dragon Reborn clears the field!", 2200);
+      this.cameras.main.flash(260, 255, 240, 180);
+      AudioKit.beep("lightning");
+    }
+
+    tickRand() {
+      if (this.randUntil <= this.time.now) {
+        if (this.rand.alpha > 0) this.tweens.add({ targets: this.rand, alpha: 0, duration: 300 });
+        return;
       }
+      this.rand.x += ((this.riley.x + 110) - this.rand.x) * 0.2;
+      this.rand.y += ((this.riley.y - 8) - this.rand.y) * 0.2;
+      if (this.time.now < this.randClearAt) return;
+      this.randClearAt = this.time.now + 180;
+      const zap = (group) => {
+        group.children.iterate((foe) => {
+          if (foe && foe.active) this.hurtFoe(foe, 99);
+        });
+      };
+      zap(this.trollocs);
+      zap(this.hazards);
     }
 
     onGate(_riley, item) {
-      if (this.saidin >= 0.38) {
+      if (this.weaponLevel >= 2 || this.randUntil > this.time.now) {
         this.gateWarned = false;
         return;
       }
@@ -1017,19 +1067,14 @@
       if (!this.gateWarned) {
         this.gateWarned = true;
         this.gateWarnUntil = now + WAYGATE_WARN_MS;
-        this.bounceGate(item);
-        this.flashWarn("Too little of the Power — gather saidin!", 1600);
+        this.riley.setVelocityY(-80);
+        this.riley.x = Math.max(170, this.riley.x - 48);
+        this.flashWarn("Need a stronger weave for the Waygate!", 1600);
+        AudioKit.beep("oof");
         return;
       }
       if (now < this.gateWarnUntil) return;
       this.die("The Waygate wanted more of the One Power than Riley had on hand.");
-    }
-
-    bounceGate(item) {
-      this.riley.setVelocityY(-80);
-      this.riley.x = Math.max(170, this.riley.x - 48);
-      if (item && item.body) item.setVelocityX(-(this.scroll + 8));
-      AudioKit.beep("oof");
     }
 
     floatLabel(x, y, text) {
@@ -1049,78 +1094,28 @@
       });
     }
 
+    refreshHUD() {
+      const hearts = "♥".repeat(this.hp) + "♡".repeat(Math.max(0, this.maxHp - this.hp));
+      this.heartText.setText(hearts);
+      const spec = WEAPONS[this.weaponLevel] || WEAPONS[1];
+      const need = SHARDS_TO_LEVEL[this.weaponLevel] || 3;
+      const t = this.weaponLevel >= 3 ? 1 : (this.weaponXP / need);
+      this.meterFill.width = 504 * Math.max(0.06, t);
+      this.meterFill.setFillStyle(this.weaponLevel >= 3 ? 0xfff1b0 : this.weaponLevel === 2 ? 0x6ec8ff : 0xff7a3a);
+      this.meterLabel.setText(this.randUntil > this.time.now ? "DRAGON REBORN" : spec.name);
+    }
+
     applyRileyLook() {
-      const key = this.kicking ? "rileyKick" : "rileyIdle";
+      const key = this.casting ? "rileyKick" : "rileyIdle";
       if (this.riley.texture.key !== key) this.riley.setTexture(key);
-      let sx = key === "rileyKick" ? 0.62 : 0.7;
-      let sy = key === "rileyKick" ? 0.62 : 0.7;
+      let sx = key === "rileyKick" ? 0.6 : 0.7;
+      let sy = sx;
       if (this.dive) sy *= 0.86;
-      if (this.fireKick > 0) {
-        sx *= 1.06;
-        sy *= 1.06;
-      }
       this.riley.setScale(sx, sy);
-      const bw = key === "rileyKick" ? 110 : 88;
+      const bw = 90;
       const bh = 110;
       this.riley.body.setSize(bw, bh);
       this.riley.body.setOffset((this.riley.width - bw) / 2, (this.riley.height - bh) / 2);
-
-      const ready = this.saidin >= LIGHTNING_NEED;
-      this.lightningArmed = ready;
-      this.meterFill.width = 504 * Math.max(0.04, Phaser.Math.Clamp(this.saidin, 0, 1));
-      this.meterFill.setFillStyle(ready ? 0xffe27a : this.saidin < 0.25 ? 0x7aa0c8 : 0x6ec8ff);
-      this.meterLabel.setText(ready ? "LIGHTNING READY" : "SAIDIN");
-
-      if (this.power() >= WARDER_NEED && !this.warderOn) {
-        this.warderOn = true;
-        this.flashWarn("A Warder joins the kick!", 1800);
-        this.tweens.add({ targets: this.warder, alpha: 1, duration: 400 });
-      }
-      if (this.power() < WARDER_NEED - 0.12 && this.warderOn) {
-        this.warderOn = false;
-        this.tweens.add({ targets: this.warder, alpha: 0, duration: 300 });
-      }
-    }
-
-    magnetKicks(dt) {
-      if (!this.kicking) return;
-      const range = KICK_MAGNET * (this.fireKick > 0 ? 1.25 : 1);
-      this.trollocs.children.iterate((foe) => {
-        if (!foe || !foe.active) return;
-        const dx = (this.riley.x + 70) - foe.x;
-        const dy = this.riley.y - foe.y;
-        const dist = Math.hypot(dx, dy);
-        if (dist < range && dist > 8) {
-          const pull = ((range - dist) / range) * 240 * (dt / 1000);
-          foe.x += (dx / dist) * pull;
-          foe.y += (dy / dist) * pull;
-        }
-      });
-    }
-
-    tickWarder() {
-      const targetX = this.riley.x - 108;
-      const targetY = this.riley.y + 8;
-      this.warder.x += (targetX - this.warder.x) * 0.18;
-      this.warder.y += (targetY - this.warder.y) * 0.18;
-      if (!this.warderOn) return;
-      if (this.time.now < this.warderKickAt) return;
-      this.warderKickAt = this.time.now + Math.max(260, 420 / this.kickSpeed);
-      let best = null;
-      let bestD = 190;
-      this.trollocs.children.iterate((foe) => {
-        if (!foe || !foe.active) return;
-        const d = Math.hypot(foe.x - this.warder.x, foe.y - this.warder.y);
-        if (d < bestD) {
-          best = foe;
-          bestD = d;
-        }
-      });
-      if (best) {
-        this.warderKickPose = true;
-        this.defeatEnemy(best, 40, "Warder!");
-        this.time.delayedCall(140, () => { this.warderKickPose = false; });
-      }
     }
 
     softBounds() {
@@ -1142,20 +1137,17 @@
       if (this.dead) return;
       this.runMs += dt;
       this.invuln = Math.max(0, this.invuln - dt);
-      this.fireKick = Math.max(0, this.fireKick - dt);
-      this.slowWeave = Math.max(0, this.slowWeave - dt);
-      this.hopBoost = Math.max(0, this.hopBoost - dt);
-      this.shieldMs = Math.max(0, this.shieldMs - dt);
-      this.lightningFlash = Math.max(0, this.lightningFlash - dt);
+      this.fireCool = Math.max(0, this.fireCool - dt);
+      if (this.time.now >= this.castUntil) this.casting = false;
 
-      if (this.time.now >= this.kickUntil) this.kicking = false;
+      if (this.cutscene) return;
 
       const spaceDown = this.cursors.space.isDown;
       if (spaceDown) this.holdBoost = true;
       if (spaceDown || this.holdBoost) this.holdJet(dt);
 
-      if (this.saidin >= 0.38) this.gateWarned = false;
-      if (this.gateWarned && this.time.now >= this.gateWarnUntil && this.saidin < 0.38) {
+      if (this.weaponLevel >= 2) this.gateWarned = false;
+      if (this.gateWarned && this.time.now >= this.gateWarnUntil && this.weaponLevel < 2) {
         let stuck = false;
         this.gates.children.iterate((gate) => {
           if (gate && gate.active && this.physics.overlap(this.riley, gate)) stuck = true;
@@ -1170,8 +1162,7 @@
       this.riley.body.velocity.y += (targetY - this.riley.y) * 0.055;
 
       const ramp = Math.min(92, this.runMs / 1000 * 1.15);
-      const slow = this.slowWeave > 0 ? 0.58 : 1;
-      this.scroll = (86 + ramp) * slow;
+      this.scroll = 86 + ramp;
       this.distance += (this.scroll * dt) / 1000;
       this.score += dt * 0.018;
 
@@ -1192,20 +1183,41 @@
       wrapPair(this.bg1, this.bg2);
       wrapPair(this.rail1, this.rail2);
 
-      this.magnetKicks(dt);
-      this.tickWarder();
+      this.tickRand();
       this.softBounds();
       this.applyRileyLook();
+      this.refreshHUD();
+      this.syncHpBars();
       this.sweep(this.trollocs);
       this.sweep(this.hazards);
       this.sweep(this.pickups);
       this.sweep(this.gates);
+      this.shotsGroup.children.iterate((shot) => {
+        if (shot && shot.x > W + 160) shot.destroy();
+      });
 
-      if (this.invuln > 0 || this.shieldMs > 0) this.riley.setAlpha(0.55 + 0.45 * Math.sin(this.runMs / 40));
+      if (this.invuln > 0) this.riley.setAlpha(0.55 + 0.45 * Math.sin(this.runMs / 40));
       else this.riley.setAlpha(1);
 
       this.scoreText.setText(`Score ${Math.floor(this.score)}`);
       this.syncScrollVelocities();
+    }
+
+    syncHpBars() {
+      const sync = (group) => {
+        group.children.iterate((foe) => {
+          if (!foe || !foe.active) return;
+          const bar = foe.getData("hpBar");
+          if (!bar || !bar.active) return;
+          const hp = foe.getData("hp") || 0;
+          const max = foe.getData("maxHp") || 1;
+          bar.x = foe.x;
+          bar.y = foe.y - Math.max(58, foe.displayHeight * 0.42);
+          bar.width = 64 * Math.max(0, hp / max);
+        });
+      };
+      sync(this.trollocs);
+      sync(this.hazards);
     }
 
     itemSpeed() {
@@ -1227,7 +1239,11 @@
 
     sweep(group) {
       group.children.iterate((child) => {
-        if (child && child.x < -180) child.destroy();
+        if (child && child.x < -180) {
+          const bar = child.getData && child.getData("hpBar");
+          if (bar && bar.destroy) bar.destroy();
+          child.destroy();
+        }
       });
     }
 
@@ -1246,7 +1262,7 @@
       const run = {
         score: Math.floor(this.score),
         distance: Math.floor(this.distance),
-        kicks: this.kickCount,
+        kicks: this.shots,
         trollocs: this.trollocsDown,
         reason,
         prevLast: prevLast ? prevLast.score : null,
