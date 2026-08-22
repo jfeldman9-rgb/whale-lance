@@ -3,7 +3,7 @@
 
   const W = 1280;
   const H = 720;
-  const VERSION = "2.3.0";
+  const VERSION = "2.4.0";
   const SAFE_MS = 2600;
   const MAX_FOES = 8;
   const FOE_SPAWN_X = W - 105;
@@ -29,6 +29,8 @@
     trolloc: { hp: 3, score: 80, scale: 1.03, hit: 0.52, amp: 18 },
     brute: { hp: 7, score: 175, scale: 1.04, hit: 0.56, amp: 13 },
     fade: { hp: 5, score: 155, scale: 0.9, hit: 0.38, amp: 38 },
+    forsaken: { hp: 14, score: 325, scale: 0.46, hit: 0.4, amp: 48, speedMult: 0.78 },
+    taim: { hp: 56, score: 950, scale: 0.5, hit: 0.44, amp: 30, speedMult: 0.58 },
   };
 
   const MUSIC_KEYS = Array.from({ length: 9 }, (_v, i) => "music" + String(i).padStart(2, "0"));
@@ -42,6 +44,12 @@
     vRileyRetry: "assets/audio/voices/riley-retry.mp3",
     vDragonStand: "assets/audio/voices/dragon-stand-ground.mp3",
     vFade: "assets/audio/voices/fade-eyeless.mp3",
+    vForsakenSpawn: "assets/audio/voices/forsaken-spawn.mp3",
+    vForsakenAttack: "assets/audio/voices/forsaken-attack.mp3",
+    vForsakenDefeat: "assets/audio/voices/forsaken-defeat.mp3",
+    vTaimSpawn: "assets/audio/voices/taim-spawn.mp3",
+    vTaimAttack: "assets/audio/voices/taim-attack.mp3",
+    vTaimDefeat: "assets/audio/voices/taim-defeat.mp3",
   };
 
   const KEYS = {
@@ -451,6 +459,8 @@
       this.load.image("trolloc", "assets/trolloc.png");
       this.load.image("brute", "assets/trolloc-brute.png");
       this.load.image("fade", "assets/fade.png");
+      this.load.image("forsaken", "assets/forsaken-v1.png");
+      this.load.image("taim", "assets/mazrim-taim-v1.png");
       this.load.image("heart", "assets/heart-pickup.png");
       this.load.image("shard", "assets/weapon-shard.png");
       this.load.image("dragon", "assets/dragon-terangreal.png");
@@ -644,6 +654,13 @@
       this.firstKillVoice = false;
       this.firstFoeSpawned = false;
       this.fadeVoice = false;
+      this.forsakenSpawnVoice = false;
+      this.forsakenAttackVoice = false;
+      this.forsakenDefeatVoice = false;
+      this.taimSpawnVoice = false;
+      this.taimAttackVoice = false;
+      this.taimDefeatVoice = false;
+      this.taimSpawned = false;
       this.lowVoice = false;
       this.dragVoice = false;
       this.dragonUsed = false;
@@ -884,8 +901,11 @@
       const roll = Math.random();
       if (this.runMs < 12000) return "trolloc";
       if (this.runMs < 24000) return roll < 0.8 ? "trolloc" : "brute";
-      if (this.runMs < 36000) return roll < 0.6 ? "trolloc" : roll < 0.85 ? "brute" : "fade";
-      return roll < 0.45 ? "trolloc" : roll < 0.75 ? "brute" : "fade";
+      if (this.runMs < 28000) return roll < 0.6 ? "trolloc" : roll < 0.85 ? "brute" : "fade";
+      if (this.runMs < 40000) {
+        return roll < 0.55 ? "trolloc" : roll < 0.8 ? "brute" : roll < 0.92 ? "fade" : "forsaken";
+      }
+      return roll < 0.38 ? "trolloc" : roll < 0.65 ? "brute" : roll < 0.83 ? "fade" : "forsaken";
     }
 
     nextLaneY() {
@@ -898,9 +918,18 @@
     spawnWave() {
       if (this.dead || this.cutscene) return;
       const foeCount = this.trollocs.countActive(true) + this.hazards.countActive(true);
-      const foeCap = this.maxFoes();
+      const taimAlive = this.hazards.getChildren().some((foe) => foe.active && foe.getData("kind") === "taim");
+      const taimPending = this.runMs >= 52000 && !this.taimSpawned;
+      const foeCap = Math.max(1, this.maxFoes() - (taimAlive || taimPending ? 2 : 0));
       if (this.runMs < 10000) {
         if (foeCount < foeCap) this.spawnFoe("trolloc", this.nextLaneY());
+        return;
+      }
+
+      if (this.runMs >= 52000 && !this.taimSpawned && foeCount <= this.maxFoes() - 2) {
+        this.taimSpawned = true;
+        this.flashWarn("MAZRIM TAIM ENTERS THE PATTERN", 1800);
+        this.spawnFoe("taim", 350);
         return;
       }
 
@@ -938,10 +967,15 @@
 
     spawnFormation() {
       const pair = Math.random() < 0.5 ? [210, 490] : [255, 455];
-      this.spawnFoe(this.chooseFoe(), pair[0] + Phaser.Math.Between(-15, 15));
+      const firstKind = this.chooseFoe();
+      this.spawnFoe(firstKind, pair[0] + Phaser.Math.Between(-15, 15));
       this.time.delayedCall(320, () => {
-        if (!this.dead && !this.cutscene && this.trollocs.countActive(true) + this.hazards.countActive(true) < this.maxFoes()) {
-          this.spawnFoe(Math.random() < 0.7 ? "trolloc" : this.chooseFoe(), pair[1] + Phaser.Math.Between(-15, 15));
+        const taimAlive = this.hazards.getChildren().some((foe) => foe.active && foe.getData("kind") === "taim");
+        const taimPending = this.runMs >= 52000 && !this.taimSpawned;
+        const foeCap = Math.max(1, this.maxFoes() - (taimAlive || taimPending ? 2 : 0));
+        if (!this.dead && !this.cutscene && this.trollocs.countActive(true) + this.hazards.countActive(true) < foeCap) {
+          const secondKind = firstKind === "forsaken" || Math.random() < 0.7 ? "trolloc" : this.chooseFoe();
+          this.spawnFoe(secondKind, pair[1] + Phaser.Math.Between(-15, 15));
         }
       });
       this.flashWarn("PATTERN WAVE", 1000);
@@ -949,7 +983,7 @@
 
     spawnFoe(kind, y) {
       const spec = FOES[kind];
-      const group = kind === "fade" ? this.hazards : this.trollocs;
+      const group = ["fade", "forsaken", "taim"].includes(kind) ? this.hazards : this.trollocs;
       const foe = this.spawnItem(group, kind, y, spec.scale, spec.hit, FOE_SPAWN_X);
       foe.setData("hp", spec.hp);
       foe.setData("maxHp", spec.hp);
@@ -957,20 +991,31 @@
       foe.setData("baseY", y);
       foe.setData("phase", Phaser.Math.FloatBetween(0, Math.PI * 2));
       foe.setData("amp", spec.amp + Math.min(18, this.runMs / 4000));
+      foe.setData("speedMult", spec.speedMult || 1);
       foe.setData("telegraphing", false);
       foe.setData("attackable", false);
-      foe.setData("entryUntil", this.time.now + FOE_ENTRY_MS);
+      const entryUntil = this.time.now + FOE_ENTRY_MS;
+      foe.setData("entryUntil", entryUntil);
       foe.setAlpha(1).clearTint();
-      const canShoot = (kind === "brute" && this.runMs >= 18000) || (kind === "fade" && this.runMs >= 24000);
-      foe.setData("attackAt", canShoot ? this.time.now + Phaser.Math.Between(2200, 3000) : Number.POSITIVE_INFINITY);
+      const canShoot = (kind === "brute" && this.runMs >= 18000)
+        || (kind === "fade" && this.runMs >= 24000)
+        || kind === "forsaken"
+        || kind === "taim";
+      const firstAttackAt = kind === "forsaken"
+        ? entryUntil
+        : kind === "taim"
+          ? entryUntil + 1200
+          : this.time.now + Phaser.Math.Between(2200, 3000);
+      foe.setData("attackAt", canShoot ? firstAttackAt : Number.POSITIVE_INFINITY);
+      const entryColor = kind === "taim" ? 0xff355e : kind === "forsaken" ? 0xb45cff : 0xff6a32;
       const entryHalo = this.add.ellipse(
         foe.x,
         foe.y,
         foe.displayWidth * 0.9,
         foe.displayHeight * 0.96,
-        0xff6a32,
+        entryColor,
         0.14,
-      ).setStrokeStyle(4, 0xffc45c, 0.9).setDepth(8);
+      ).setStrokeStyle(4, entryColor, 0.9).setDepth(8);
       this.tweens.add({
         targets: entryHalo,
         scaleX: 1.12,
@@ -981,7 +1026,9 @@
         repeat: 1,
       });
       foe.setData("entryHalo", entryHalo);
-      const entryLabel = this.add.text(foe.x, foe.y - foe.displayHeight * 0.58, kind.toUpperCase(), {
+      const displayName = kind === "taim" ? "MAZRIM TAIM" : kind.toUpperCase();
+      const entryLabelY = Phaser.Math.Clamp(foe.y - foe.displayHeight * 0.58, 30, H - 30);
+      const entryLabel = this.add.text(foe.x, entryLabelY, displayName, {
         fontFamily: "Impact, sans-serif",
         fontSize: "17px",
         color: "#fff0b0",
@@ -998,6 +1045,12 @@
       foe.setData("hpBar", bar);
       if (kind === "fade" && !this.fadeVoice) {
         if (AudioDirector.speak(this, "vFade", 2)) this.fadeVoice = true;
+      }
+      if (kind === "forsaken" && !this.forsakenSpawnVoice) {
+        if (AudioDirector.speak(this, "vForsakenSpawn", 3)) this.forsakenSpawnVoice = true;
+      }
+      if (kind === "taim" && !this.taimSpawnVoice) {
+        if (AudioDirector.speak(this, "vTaimSpawn", 5)) this.taimSpawnVoice = true;
       }
       if (!this.firstFoeSpawned) {
         this.firstFoeSpawned = true;
@@ -1029,43 +1082,83 @@
       if (!foe.active || foe.getData("telegraphing")) return;
       foe.setData("telegraphing", true);
       foe.setData("attackAt", Number.POSITIVE_INFINITY);
-      const color = foe.getData("kind") === "fade" ? 0xa77cff : 0xff734f;
-      const ring = this.add.circle(foe.x, foe.y, 24, color, 0.12).setStrokeStyle(5, color, 0.9).setDepth(13);
+      const kind = foe.getData("kind");
+      const color = kind === "taim" ? 0xff355e : ["fade", "forsaken"].includes(kind) ? 0xa77cff : 0xff734f;
+      const windup = kind === "taim" ? 1150 : kind === "forsaken" ? 900 : 880;
+      const ringRadius = kind === "taim" ? 34 : kind === "forsaken" ? 28 : 24;
+      const ring = this.add.circle(foe.x, foe.y, ringRadius, color, 0.12)
+        .setStrokeStyle(kind === "taim" ? 7 : 5, color, 0.9)
+        .setDepth(13);
       foe.setData("telegraphRing", ring);
       this.tweens.add({
         targets: ring,
-        scale: 2.1,
+        scale: kind === "taim" ? 2.55 : kind === "forsaken" ? 2.3 : 2.1,
         alpha: 0,
-        duration: 880,
+        duration: windup,
         ease: "Quad.out",
         onComplete: () => {
           if (ring.active) ring.destroy();
           if (foe.active && foe.getData("telegraphRing") === ring) foe.setData("telegraphRing", null);
-          if (foe.active && !this.dead && !this.cutscene) this.launchEnemyShot(foe);
+          if (foe.active && !this.dead && !this.cutscene) this.launchEnemyVolley(foe);
           if (foe.active) {
             foe.setData("telegraphing", false);
-            foe.setData("attackAt", this.time.now + Phaser.Math.Between(3400, 4600));
+            const cooldown = kind === "taim"
+              ? Phaser.Math.Between(4200, 5200)
+              : kind === "forsaken"
+                ? Phaser.Math.Between(4800, 6000)
+                : Phaser.Math.Between(3400, 4600);
+            foe.setData("attackAt", this.time.now + cooldown);
           }
         },
       });
     }
 
-    launchEnemyShot(foe) {
+    launchEnemyVolley(foe) {
+      if (!foe.active) return;
+      const kind = foe.getData("kind");
+      if (kind === "forsaken" && !this.forsakenAttackVoice) {
+        if (AudioDirector.speak(this, "vForsakenAttack", 2)) this.forsakenAttackVoice = true;
+      }
+      if (kind === "taim" && !this.taimAttackVoice) {
+        if (AudioDirector.speak(this, "vTaimAttack", 5)) this.taimAttackVoice = true;
+      }
+      if (kind === "forsaken") {
+        this.launchEnemyShot(foe);
+        this.time.delayedCall(260, () => {
+          if (foe.active && !this.dead && !this.cutscene) this.launchEnemyShot(foe);
+        });
+      } else if (kind === "taim") {
+        [-0.21, 0, 0.21].forEach((angleOffset) => this.launchEnemyShot(foe, angleOffset));
+      } else {
+        this.launchEnemyShot(foe);
+      }
+      AudioKit.beep("block");
+    }
+
+    launchEnemyShot(foe, angleOffset = 0) {
       const orb = this.enemyShots.create(foe.x - 28, foe.y, "fireball");
-      const fadeShot = foe.getData("kind") === "fade";
-      orb.setScale(fadeShot ? 0.24 : 0.2);
-      orb.setTint(fadeShot ? 0xb484ff : 0xff5a45);
+      const kind = foe.getData("kind");
+      const shotStyle = kind === "taim"
+        ? { scale: 0.28, tint: 0xff294d, glow: 0x99152f, speedBonus: 35 }
+        : kind === "forsaken"
+          ? { scale: 0.23, tint: 0xc06cff, glow: 0x7f43c7, speedBonus: 20 }
+          : kind === "fade"
+            ? { scale: 0.24, tint: 0xb484ff, glow: 0x8d5cff, speedBonus: 0 }
+            : { scale: 0.2, tint: 0xff5a45, glow: 0xff4c35, speedBonus: 0 };
+      orb.setScale(shotStyle.scale);
+      orb.setTint(shotStyle.tint);
       orb.body.allowGravity = false;
       orb.setDepth(12);
       orb.setData("kind", "enemyShot");
+      orb.setData("sourceKind", kind);
       orb.body.setCircle(Math.min(orb.width, orb.height) * 0.24);
-      const angle = Math.atan2(this.riley.y - foe.y, this.riley.x - foe.x);
+      const angle = Math.atan2(this.riley.y - foe.y, this.riley.x - foe.x) + angleOffset;
       const rangedRamp = Math.max(0, this.runMs - 18000) / 600;
-      const speed = 225 + Math.min(70, rangedRamp);
+      const speed = 225 + Math.min(70, rangedRamp) + shotStyle.speedBonus;
       this.physics.velocityFromRotation(angle, speed, orb.body.velocity);
-      const glow = this.add.circle(orb.x, orb.y, 25, fadeShot ? 0x8d5cff : 0xff4c35, 0.22).setDepth(11);
+      const glowRadius = kind === "taim" ? 31 : kind === "forsaken" ? 27 : 25;
+      const glow = this.add.circle(orb.x, orb.y, glowRadius, shotStyle.glow, 0.22).setDepth(11);
       orb.setData("glow", glow);
-      AudioKit.beep("block");
     }
 
     autoFire() {
@@ -1147,13 +1240,20 @@
       const x = foe.x;
       const y = foe.y;
       const score = foe.getData("score") || 45;
-      const isEnemy = foe.getData("kind") !== "waygate";
+      const kind = foe.getData("kind");
+      const isEnemy = kind !== "waygate";
       if (isEnemy) this.trollocsDown += 1;
       this.score += score;
       this.cleanupObjectFx(foe);
       foe.destroy();
       this.impactBurst(x, y, 0xffd66a, 11);
       this.cameras.main.shake(55, 0.0022);
+      if (kind === "forsaken" && !this.forsakenDefeatVoice) {
+        if (AudioDirector.speak(this, "vForsakenDefeat", 3)) this.forsakenDefeatVoice = true;
+      }
+      if (kind === "taim" && !this.taimDefeatVoice) {
+        if (AudioDirector.speak(this, "vTaimDefeat", 5)) this.taimDefeatVoice = true;
+      }
       if (isEnemy && !this.firstKillVoice) {
         if (AudioDirector.speak(this, "vRileyFirstKill", 2)) this.firstKillVoice = true;
       }
@@ -1164,11 +1264,23 @@
         this.hurtFoe(foe, 99);
         return;
       }
-      this.takeHit(foe, "A Trolloc found the one gap Riley did not.");
+      const kind = foe.getData("kind");
+      const reason = kind === "taim"
+        ? "Mazrim Taim broke Riley's defense."
+        : kind === "forsaken"
+          ? "A Forsaken stepped through Riley's guard."
+          : "A Trolloc found the one gap Riley did not.";
+      this.takeHit(foe, reason);
     }
 
     onEnemyShotTouch(_riley, orb) {
-      this.takeHit(orb, "The Shadow found its mark.");
+      const sourceKind = orb.getData("sourceKind");
+      const reason = sourceKind === "taim"
+        ? "Mazrim Taim's fire found its mark."
+        : sourceKind === "forsaken"
+          ? "A Forsaken's fire found its mark."
+          : "The Shadow found its mark.";
+      this.takeHit(orb, reason);
     }
 
     onGateTouch(_riley, gate) {
@@ -1366,7 +1478,7 @@
           const baseY = foe.getData("baseY") || foe.y;
           const targetY = Phaser.Math.Clamp(baseY + Math.sin(this.runMs / 520 + phase) * amplitude, 175, 545);
           const verticalSpeed = Phaser.Math.Clamp((targetY - foe.y) * 7, -170, 170);
-          foe.setVelocity(this.itemSpeed(), verticalSpeed);
+          foe.setVelocity(this.itemSpeed() * (foe.getData("speedMult") || 1), verticalSpeed);
           if (foe.getData("attackable") === false && this.time.now >= (foe.getData("entryUntil") || 0)) {
             foe.setData("attackable", true);
             const entryHalo = foe.getData("entryHalo");
@@ -1394,7 +1506,7 @@
           const entryLabel = foe.getData("entryLabel");
           if (entryLabel && entryLabel.active) {
             entryLabel.x = foe.x;
-            entryLabel.y = foe.y - foe.displayHeight * 0.58;
+            entryLabel.y = Phaser.Math.Clamp(foe.y - foe.displayHeight * 0.58, 30, H - 30);
           }
           const bar = foe.getData("hpBar");
           const barBack = foe.getData("hpBarBack");
