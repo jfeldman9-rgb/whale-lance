@@ -3,44 +3,42 @@
 
   const W = 1280;
   const H = 720;
-  const LANCE_X = 300;
-  const FLOOR_Y = 508;
+  const RILEY_X = 290;
+  const FLOOR_Y = 528;
   const CEIL_Y = 168;
-  const SAFE_MS = 9000;
+  const SAFE_MS = 7000;
   const HOLD_JET_MS = 220;
-  const DOOR_WARN_MS = 1500;
-  const PANCAKE_LOSE_MS = 2500;
+  const WAYGATE_WARN_MS = 1500;
   const TUTORIAL_MS = 6200;
-  const FOOD_MAGNET = 128;
-  const MAX_FOOD = 4;
-  const PUFFY = 0.88;
-  const FROYO_DRAIN = 0.4;
-  const FROYO_EMPTY = 0.28;
-  const FROYO_H = 118;
+  const KICK_MAGNET = 150;
+  const MAX_TROLLOCS = 4;
+  const LIGHTNING_NEED = 0.78;
+  const WARDER_NEED = 0.54;
+  const KICK_BASE_MS = 340;
 
   const KEYS = {
-    best: "whaleLance.best",
-    last: "whaleLance.last",
-    mute: "whaleLance.mute",
-    learned: "whaleLance.learned",
+    best: "tkdRiley.best",
+    last: "tkdRiley.last",
+    mute: "tkdRiley.mute",
+    learned: "tkdRiley.learned",
+    seenIntro: "tkdRiley.seenIntro",
   };
 
-  const FOOD = {
-    spaghetti: { inflate: 0.14, score: 50, bonus: true },
-    poi: { inflate: 0.08, score: 22 },
-    musubi: { inflate: 0.09, score: 24 },
-    pineapple: { inflate: 0.07, score: 18 },
-    chocolate: { inflate: 0.15, score: 28, overfill: true },
-    froyo: { drain: FROYO_DRAIN, score: 0, trap: true },
-  };
+  const TERANGREAL = [
+    { id: "shield", label: "Air shield!", ms: 3600 },
+    { id: "slow", label: "Slow weave!", ms: 4200 },
+    { id: "fire", label: "Fire kick!", ms: 6200 },
+    { id: "hop", label: "Folded air!", ms: 5000 },
+    { id: "heal", label: "Second chance!", ms: 0 },
+  ];
 
   const JOKES = [
-    "He's not late. He's buffet-paced.",
-    "Whale Lance: professionally snack-loaded.",
-    "One more plate. For science.",
-    "The lei stayed home. The towel did not.",
-    "Aim away from the omelet station, pops.",
-    "Frozen yogurt is not a protein, pops.",
+    "The Wheel weaves as he kicks.",
+    "Trollocs hate homework and high kicks.",
+    "Saidin first. Then lightning.",
+    "A Warder is just a very serious spotter.",
+    "Ter'angreal: shake well before kicking.",
+    "Angreal: for when one kick is not enough.",
   ];
 
   function loadScores() {
@@ -72,9 +70,17 @@
     localStorage.setItem(KEYS.learned, "1");
   }
 
+  function seenIntro() {
+    return localStorage.getItem(KEYS.seenIntro) === "1";
+  }
+
+  function markIntro() {
+    localStorage.setItem(KEYS.seenIntro, "1");
+  }
+
   function isMagenta(r, g, b, a = 255) {
     if (a < 8) return true;
-    const mag = r > 200 && b > 200 && g < 90 && (r + b) > g * 4;
+    const mag = r > 190 && b > 160 && g < 120 && (r + b) > g * 2.4;
     return mag;
   }
 
@@ -132,26 +138,6 @@
     return true;
   }
 
-  function makeFroyoCup(scene) {
-    const g = scene.make.graphics({ x: 0, y: 0, add: false });
-    g.fillStyle(0xf4c4c8, 1);
-    g.fillRoundedRect(36, 118, 128, 150, 18);
-    g.lineStyle(6, 0x3a1a16, 1);
-    g.strokeRoundedRect(36, 118, 128, 150, 18);
-    g.fillStyle(0xfff6ea, 1);
-    g.fillEllipse(100, 118, 132, 36);
-    g.fillStyle(0xffe6ee, 1);
-    g.fillCircle(78, 78, 38);
-    g.fillStyle(0xfff8f2, 1);
-    g.fillCircle(108, 58, 34);
-    g.fillStyle(0xf7d0d8, 1);
-    g.fillCircle(130, 86, 28);
-    g.fillStyle(0x6aa34a, 1);
-    g.fillCircle(148, 176, 22);
-    g.generateTexture("froyo", 200, 280);
-    g.destroy();
-  }
-
   const AudioKit = {
     ctx: null,
     ensure() {
@@ -171,38 +157,38 @@
       const gain = ctx.createGain();
       osc.connect(gain);
       gain.connect(ctx.destination);
-      if (kind === "toot") {
-        osc.type = "triangle";
-        osc.frequency.setValueAtTime(90, now);
-        osc.frequency.exponentialRampToValueAtTime(46, now + 0.16);
-        gain.gain.setValueAtTime(0.12, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+      if (kind === "kick") {
+        osc.type = "square";
+        osc.frequency.setValueAtTime(180, now);
+        osc.frequency.exponentialRampToValueAtTime(70, now + 0.12);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
         osc.start(now);
-        osc.stop(now + 0.2);
+        osc.stop(now + 0.15);
       } else if (kind === "jet") {
         osc.type = "sawtooth";
-        osc.frequency.setValueAtTime(70, now);
-        osc.frequency.linearRampToValueAtTime(50, now + 0.08);
-        gain.gain.setValueAtTime(0.05, now);
+        osc.frequency.setValueAtTime(90, now);
+        osc.frequency.linearRampToValueAtTime(60, now + 0.08);
+        gain.gain.setValueAtTime(0.04, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
         osc.start(now);
         osc.stop(now + 0.1);
-      } else if (kind === "eat") {
-        osc.type = "square";
-        osc.frequency.setValueAtTime(220, now);
+      } else if (kind === "hit") {
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(320, now);
         osc.frequency.exponentialRampToValueAtTime(140, now + 0.1);
-        gain.gain.setValueAtTime(0.07, now);
+        gain.gain.setValueAtTime(0.08, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
         osc.start(now);
         osc.stop(now + 0.13);
-      } else if (kind === "stud") {
+      } else if (kind === "power") {
         osc.type = "sine";
-        osc.frequency.setValueAtTime(520, now);
-        osc.frequency.exponentialRampToValueAtTime(880, now + 0.16);
+        osc.frequency.setValueAtTime(420, now);
+        osc.frequency.exponentialRampToValueAtTime(880, now + 0.18);
         gain.gain.setValueAtTime(0.08, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
         osc.start(now);
-        osc.stop(now + 0.22);
+        osc.stop(now + 0.24);
       } else if (kind === "oof") {
         osc.type = "sine";
         osc.frequency.setValueAtTime(180, now);
@@ -211,14 +197,14 @@
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
         osc.start(now);
         osc.stop(now + 0.2);
-      } else if (kind === "bleh") {
-        osc.type = "triangle";
-        osc.frequency.setValueAtTime(210, now);
-        osc.frequency.exponentialRampToValueAtTime(64, now + 0.28);
-        gain.gain.setValueAtTime(0.09, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+      } else if (kind === "lightning") {
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(740, now);
+        osc.frequency.exponentialRampToValueAtTime(90, now + 0.32);
+        gain.gain.setValueAtTime(0.11, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.34);
         osc.start(now);
-        osc.stop(now + 0.32);
+        osc.stop(now + 0.36);
       } else if (kind === "bonk") {
         osc.type = "square";
         osc.frequency.setValueAtTime(140, now);
@@ -236,9 +222,9 @@
       super("boot");
     }
     preload() {
-      const bar = this.add.rectangle(W / 2, H / 2, 360, 18, 0x1b6b8a);
+      const bar = this.add.rectangle(W / 2, H / 2, 360, 18, 0x3a2a12);
       const fill = this.add.rectangle(W / 2 - 178, H / 2, 4, 12, 0xffe27a).setOrigin(0, 0.5);
-      this.add.text(W / 2, H / 2 - 46, "Warming up the buffet…", {
+      this.add.text(W / 2, H / 2 - 46, "The Wheel is turning…", {
         fontFamily: "Georgia, serif",
         fontSize: "28px",
         color: "#fff6d8",
@@ -247,48 +233,150 @@
         fill.width = 356 * p;
       });
 
-      this.load.image("titleLance", "assets/title.png");
-      this.load.image("idleInflated", "assets/idle-inflated.png");
-      this.load.image("idleDeflated", "assets/idle-deflated.png");
-      this.load.image("eatLance", "assets/eat.png");
-      this.load.image("fartBlast", "assets/fart-blast.png");
-      this.load.image("spaghetti", "assets/spaghetti.png");
-      this.load.image("poi", "assets/poi.png");
-      this.load.image("musubi", "assets/musubi.png");
-      this.load.image("pineapple", "assets/pineapple.png");
-      this.load.image("chocolate", "assets/chocolate.png");
-      this.load.image("froyo", "assets/froyo.png");
-      this.load.image("froyoSrc", "art/sprites/froyo.png");
-      this.load.image("gym", "assets/gym.png");
-      this.load.image("door", "assets/door.png");
-      this.load.image("cloud", "assets/cloud.png");
-      this.load.image("stud", "assets/stud.png");
-      this.load.image("seagull", "assets/seagull.png");
-      this.load.image("sign", "assets/sign.png");
-      this.load.image("cutsceneGym", "assets/cutscene-gym.png");
-      this.load.image("cutsceneGymSrc", "art/sprites/cutscene-gym.png");
+      this.load.image("rileyIdle", "assets/riley-idle.png");
+      this.load.image("rileyKick", "assets/riley-kick.png");
+      this.load.image("rileyTitle", "assets/riley-title.png");
+      this.load.image("trolloc", "assets/trolloc.png");
+      this.load.image("eye", "assets/eye-of-world.png");
+      this.load.image("terangreal", "assets/terangreal.png");
+      this.load.image("angreal", "assets/angreal.png");
+      this.load.image("warder", "assets/warder.png");
+      this.load.image("fade", "assets/fade.png");
+      this.load.image("slash", "assets/kick-slash.png");
+      this.load.image("waygate", "assets/waygate.png");
       this.load.image("bg", "assets/bg.jpg");
       this.load.image("bgFar", "assets/bg-far.jpg");
-      this.load.image("bgRail", "assets/bg-rail.png");
+      this.load.image("bgRail", "assets/bg-rail.jpg");
+      this.load.image("intro1", "assets/intro-1.jpg");
+      this.load.image("intro2", "assets/intro-2.jpg");
+      this.load.image("intro3", "assets/intro-3.jpg");
+      this.load.image("creditsBg", "assets/credits-bg.jpg");
+      this.load.on("loaderror", (file) => {
+        console.warn("optional asset missed", file && file.key);
+      });
     }
     create() {
-      const froyoKey = this.textures.exists("froyo") ? "froyo" : (this.textures.exists("froyoSrc") ? "froyoSrc" : null);
-      if (froyoKey) {
-        chromaKeyTexture(this, froyoKey);
-        if (froyoKey !== "froyo") this.cloneTexture(froyoKey, "froyo");
-      } else {
-        makeFroyoCup(this);
-      }
-      if (!this.textures.exists("cutsceneGym") && this.textures.exists("cutsceneGymSrc")) {
-        this.cloneTexture("cutsceneGymSrc", "cutsceneGym");
-      }
-      this.scene.start("title");
+      ["rileyIdle", "rileyKick", "rileyTitle", "trolloc", "eye", "terangreal", "angreal", "warder", "fade", "slash", "waygate"]
+        .forEach((key) => chromaKeyTexture(this, key));
+      this.scene.start(seenIntro() ? "title" : "intro");
     }
-    cloneTexture(fromKey, toKey) {
-      const img = this.textures.get(fromKey).getSourceImage();
-      if (!img) return;
-      if (img instanceof HTMLCanvasElement) this.textures.addCanvas(toKey, img);
-      else this.textures.addImage(toKey, img);
+  }
+
+  function sweepHtmlVideos() {
+    document.querySelectorAll("#tkd-video, #game video").forEach((el) => {
+      try {
+        if (el.tagName === "VIDEO") {
+          el.pause();
+          el.removeAttribute("src");
+          el.load();
+        }
+        if (el.parentNode) el.parentNode.removeChild(el);
+      } catch (_err) { /* ignore */ }
+    });
+  }
+
+  function attachVideoOverlay(url, onDone) {
+    sweepHtmlVideos();
+    const root = document.getElementById("game");
+    if (!root) {
+      onDone();
+      return { done: onDone };
+    }
+    root.style.position = "relative";
+    const wrap = document.createElement("div");
+    wrap.id = "tkd-video";
+    wrap.style.cssText = "position:absolute;left:0;top:0;width:100%;height:100%;background:#0b1020;z-index:8;display:flex;align-items:center;justify-content:center;pointer-events:none;";
+    const vid = document.createElement("video");
+    vid.src = url;
+    vid.muted = true;
+    vid.autoplay = true;
+    vid.playsInline = true;
+    vid.setAttribute("playsinline", "");
+    vid.setAttribute("muted", "");
+    vid.style.cssText = "width:100%;height:100%;object-fit:contain;pointer-events:none;";
+    let finished = false;
+    const done = () => {
+      if (finished) return;
+      finished = true;
+      try {
+        vid.pause();
+        vid.removeAttribute("src");
+        vid.load();
+      } catch (_err) { /* ignore */ }
+      if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+      onDone();
+    };
+    vid.addEventListener("ended", done);
+    vid.addEventListener("error", done);
+    wrap.appendChild(vid);
+    root.appendChild(wrap);
+    const play = vid.play();
+    if (play && play.catch) play.catch(() => done());
+    return { wrap, done };
+  }
+
+  class VideoScene extends Phaser.Scene {
+    constructor(key, videoKey, nextKey, frames) {
+      super(key);
+      this.videoKey = videoKey;
+      this.nextKey = nextKey;
+      this.frames = frames;
+    }
+    create() {
+      this.done = false;
+      this.overlay = null;
+      sweepHtmlVideos();
+      this.add.rectangle(W / 2, H / 2, W, H, 0x0b1020);
+      this.overlay = attachVideoOverlay(`assets/${this.videoKey}.mp4`, () => this.finish());
+      this.time.delayedCall(14000, () => this.finish());
+
+      const skip = this.add.text(W - 28, 22, "SKIP", {
+        fontFamily: "Impact, sans-serif",
+        fontSize: "28px",
+        color: "#fff8e0",
+        stroke: "#123",
+        strokeThickness: 5,
+      }).setOrigin(1, 0).setInteractive({ useHandCursor: true }).setDepth(8);
+      skip.on("pointerdown", (p) => {
+        if (p.event && p.event.stopPropagation) p.event.stopPropagation();
+        this.finish();
+      });
+      this.input.keyboard.once("keydown-SPACE", () => this.finish());
+      this.input.keyboard.once("keydown-ENTER", () => this.finish());
+      this.input.once("pointerdown", () => this.finish());
+    }
+    slideshow() {
+      const keys = this.frames.filter((k) => this.textures.exists(k));
+      if (!keys.length) {
+        this.time.delayedCall(400, () => this.finish());
+        return;
+      }
+      const img = this.add.image(W / 2, H / 2, keys[0]).setDisplaySize(W, H);
+      let i = 0;
+      this.time.addEvent({
+        delay: 2200,
+        repeat: keys.length - 1,
+        callback: () => {
+          i += 1;
+          if (i >= keys.length) this.finish();
+          else img.setTexture(keys[i]).setDisplaySize(W, H);
+        },
+      });
+    }
+    finish() {
+      if (this.done) return;
+      this.done = true;
+      if (this.overlay && this.overlay.done) this.overlay.done();
+      this.overlay = null;
+      sweepHtmlVideos();
+      markIntro();
+      this.scene.start(this.nextKey);
+    }
+  }
+
+  class IntroScene extends VideoScene {
+    constructor() {
+      super("intro", "intro", "title", ["intro1", "intro2", "intro3"]);
     }
   }
 
@@ -297,10 +385,11 @@
       super("title");
     }
     create() {
+      sweepHtmlVideos();
       this.drawBackdrop();
-      const lance = this.add.image(340, 400, "titleLance").setScale(0.72);
+      const riley = this.add.image(340, 400, "rileyTitle").setScale(0.92);
       this.tweens.add({
-        targets: lance,
+        targets: riley,
         y: 388,
         duration: 1600,
         yoyo: true,
@@ -308,33 +397,38 @@
         ease: "Sine.inOut",
       });
 
-      this.add.text(820, 108, "WHALE LANCE", {
+      this.add.text(820, 96, "TAE KWON", {
         fontFamily: "Georgia, Impact, serif",
-        fontSize: "76px",
+        fontSize: "58px",
         color: "#fff4c8",
-        stroke: "#8b1e2d",
+        stroke: "#5a1e10",
+        strokeThickness: 7,
+      }).setOrigin(0.5);
+      this.add.text(820, 164, "DOE RILEY", {
+        fontFamily: "Georgia, Impact, serif",
+        fontSize: "72px",
+        color: "#ffe27a",
+        stroke: "#5a1e10",
         strokeThickness: 8,
       }).setOrigin(0.5);
 
-      this.add.text(820, 198, "Tap to hop. Eat the buffet. Skip the frozen yogurt.", {
+      this.add.text(820, 236, "Tap to kick. Scatter the Trollocs. Gather the One Power.", {
         fontFamily: "Trebuchet MS, sans-serif",
-        fontSize: "26px",
+        fontSize: "24px",
         color: "#fff6d0",
         align: "center",
         wordWrap: { width: 560 },
       }).setOrigin(0.5);
 
       const { best, last } = loadScores();
-      const lastLine = last
-        ? `Last ${last.score}`
-        : "Last —";
-      this.add.text(820, 268, `Best ${best}   ·   ${lastLine}`, {
+      const lastLine = last ? `Last ${last.score}` : "Last —";
+      this.add.text(820, 300, `Best ${best}   ·   ${lastLine}`, {
         fontFamily: "Trebuchet MS, sans-serif",
         fontSize: "24px",
         color: "#e8f6ff",
       }).setOrigin(0.5);
 
-      this.add.text(820, 318, Phaser.Utils.Array.GetRandom(JOKES), {
+      this.add.text(820, 348, Phaser.Utils.Array.GetRandom(JOKES), {
         fontFamily: "Georgia, serif",
         fontSize: "22px",
         fontStyle: "italic",
@@ -367,21 +461,21 @@
     }
 
     drawBackdrop() {
-      this.add.image(W / 2, H / 2, "bg").setDisplaySize(W, H).setAlpha(0.85);
-      this.add.rectangle(W / 2, H / 2, W, H, 0x04283c, 0.28);
+      this.add.image(W / 2, H / 2, "bg").setDisplaySize(W, H).setAlpha(0.9);
+      this.add.rectangle(W / 2, H / 2, W, H, 0x120818, 0.32);
     }
 
     makeButton(x, y, label, onClick, bw = 260, bh = 72, fontSize = 40) {
-      const bg = this.add.rectangle(x, y, bw, bh, 0xe31c3d, 1)
+      const bg = this.add.rectangle(x, y, bw, bh, 0xc9a227, 1)
         .setStrokeStyle(5, 0xfff1b0)
         .setInteractive({ useHandCursor: true });
       const txt = this.add.text(x, y, label, {
         fontFamily: "Impact, Georgia, serif",
         fontSize: `${fontSize}px`,
-        color: "#fff8e0",
+        color: "#1a1208",
       }).setOrigin(0.5);
-      bg.on("pointerover", () => bg.setFillStyle(0xff4b62));
-      bg.on("pointerout", () => bg.setFillStyle(0xe31c3d));
+      bg.on("pointerover", () => bg.setFillStyle(0xffd65c));
+      bg.on("pointerout", () => bg.setFillStyle(0xc9a227));
       bg.on("pointerdown", onClick);
       return { bg, txt };
     }
@@ -401,17 +495,17 @@
     }
 
     create() {
+      sweepHtmlVideos();
       this.dead = false;
-      this.fullness = 0.56;
-      this.shownPuffyHint = false;
+      this.saidin = 0.22;
+      this.saidar = 0.18;
       this.distance = 0;
       this.score = 0;
-      this.tootCount = 0;
-      this.studs = 0;
-      this.holdToot = false;
-      this.jetting = false;
-      this.eatFlash = 0;
-      this.squashFlash = 0;
+      this.kickCount = 0;
+      this.trollocsDown = 0;
+      this.holdBoost = false;
+      this.kicking = false;
+      this.kickUntil = 0;
       this.dive = false;
       this.scroll = 86;
       this.pointerDownAt = 0;
@@ -419,45 +513,52 @@
       this.jetSfx = 0;
       this.runMs = 0;
       this.didTap = false;
-      this.didEat = false;
+      this.didKickEnemy = false;
       this.freeHitUsed = false;
-      this.invuln = 0;
-      this.puffyWarned = false;
-      this.doorWarnUntil = 0;
-      this.emptySince = 0;
-      this.froyoEaten = 0;
-      this.froyoWobble = 0;
-      this.froyoLook = 0;
-      this.shownEatPrompt = false;
-      this.shownGymPrompt = false;
+      this.invuln = SAFE_MS;
+      this.gateWarned = false;
+      this.gateWarnUntil = 0;
+      this.shownPowerPrompt = false;
+      this.shownTrollocPrompt = false;
       this.showTutorial = !hasLearned();
-      this.tapPromptUntil = 0;
       this.foodLane = 0;
+      this.kickSpeed = 1;
+      this.fireKick = 0;
+      this.slowWeave = 0;
+      this.hopBoost = 0;
+      this.shieldMs = 0;
+      this.warderOn = false;
+      this.warderKickAt = 0;
+      this.lightningFlash = 0;
+      this.lightningArmed = false;
 
       this.bgFar1 = this.add.image(0, H / 2, "bgFar").setOrigin(0, 0.5).setDisplaySize(W, H);
       this.bgFar2 = this.add.image(W, H / 2, "bgFar").setOrigin(0, 0.5).setDisplaySize(W, H);
       this.bg1 = this.add.image(0, H / 2, "bg").setOrigin(0, 0.5).setDisplaySize(W, H).setAlpha(0.92);
       this.bg2 = this.add.image(W, H / 2, "bg").setOrigin(0, 0.5).setDisplaySize(W, H).setAlpha(0.92);
-      this.rail1 = this.add.image(0, H, "bgRail").setOrigin(0, 1).setDisplaySize(W, 168).setDepth(6);
-      this.rail2 = this.add.image(W, H, "bgRail").setOrigin(0, 1).setDisplaySize(W, 168).setDepth(6);
+      this.rail1 = this.add.image(0, H, "bgRail").setOrigin(0, 1).setDisplaySize(W, 210).setDepth(6);
+      this.rail2 = this.add.image(W, H, "bgRail").setOrigin(0, 1).setDisplaySize(W, 210).setDepth(6);
 
-      this.foods = this.physics.add.group();
+      this.trollocs = this.physics.add.group();
       this.hazards = this.physics.add.group();
       this.pickups = this.physics.add.group();
-      this.doors = this.physics.add.group();
+      this.gates = this.physics.add.group();
 
-      this.lance = this.physics.add.image(LANCE_X, 350, "idleInflated");
-      this.lance.body.allowGravity = true;
-      this.lance.setMaxVelocity(0, 380);
-      this.lance.setDepth(8);
+      this.riley = this.physics.add.image(RILEY_X, 350, "rileyIdle");
+      this.riley.body.allowGravity = true;
+      this.riley.setMaxVelocity(0, 380);
+      this.riley.setDepth(8);
       this.physics.world.setBounds(0, 0, W, H);
       this.physics.world.gravity.y = 90;
-      window.WhaleLance = { play: this };
+      window.TkdRiley = { play: this };
 
-      this.physics.add.overlap(this.lance, this.foods, this.onFood, null, this);
-      this.physics.add.overlap(this.lance, this.hazards, this.onHazard, null, this);
-      this.physics.add.overlap(this.lance, this.pickups, this.onStud, null, this);
-      this.physics.add.overlap(this.lance, this.doors, this.onDoor, null, this);
+      this.warder = this.add.image(RILEY_X - 110, 360, "warder").setScale(0.52).setDepth(7).setAlpha(0);
+      this.warderKickPose = false;
+
+      this.physics.add.overlap(this.riley, this.trollocs, this.onTrolloc, null, this);
+      this.physics.add.overlap(this.riley, this.hazards, this.onHazard, null, this);
+      this.physics.add.overlap(this.riley, this.pickups, this.onPickup, null, this);
+      this.physics.add.overlap(this.riley, this.gates, this.onGate, null, this);
 
       this.scoreText = this.add.text(28, 18, "Score 0", {
         fontFamily: "Impact, Trebuchet MS, sans-serif",
@@ -468,8 +569,8 @@
       }).setDepth(20);
 
       this.meterBack = this.add.rectangle(W / 2, 42, 520, 40, 0x173246).setStrokeStyle(4, 0xfff1b0).setDepth(20);
-      this.meterFill = this.add.rectangle(W / 2 - 252, 42, 504, 28, 0x7ad36a).setOrigin(0, 0.5).setDepth(21);
-      this.meterLabel = this.add.text(W / 2, 42, "BUFFET FUEL", {
+      this.meterFill = this.add.rectangle(W / 2 - 252, 42, 504, 28, 0x6ec8ff).setOrigin(0, 0.5).setDepth(21);
+      this.meterLabel = this.add.text(W / 2, 42, "SAIDIN", {
         fontFamily: "Impact, sans-serif",
         fontSize: "26px",
         color: "#14301c",
@@ -501,7 +602,7 @@
         align: "center",
       }).setOrigin(0.5).setDepth(25).setAlpha(0);
 
-      this.finger = this.add.text(LANCE_X + 170, 230, "👆", {
+      this.finger = this.add.text(RILEY_X + 170, 230, "👆", {
         fontSize: "72px",
       }).setOrigin(0.5).setDepth(25).setAlpha(0);
       this.fingerTween = this.tweens.add({
@@ -526,11 +627,11 @@
         if (this.spaceHeld) return;
         this.spaceHeld = true;
         this.pointerDownAt = this.time.now;
-        this.hop();
+        this.kick();
       });
       this.input.keyboard.on("keyup-SPACE", () => {
         this.spaceHeld = false;
-        this.holdToot = false;
+        this.holdBoost = false;
       });
       this.input.keyboard.on("keydown-S", () => this.doDive());
       this.input.keyboard.on("keydown-DOWN", () => this.doDive());
@@ -540,11 +641,11 @@
         if (p.y < 80 && p.x > W - 100) return;
         this.pointerDownAt = this.time.now;
         this.swipeStart = { x: p.x, y: p.y, t: this.time.now };
-        this.holdToot = true;
-        this.hop();
+        this.holdBoost = true;
+        this.kick();
       });
       this.input.on("pointerup", (p) => {
-        this.holdToot = false;
+        this.holdBoost = false;
         if (this.swipeStart) {
           const dy = p.y - this.swipeStart.y;
           if (dy > 70) this.doDive();
@@ -552,13 +653,12 @@
         this.swipeStart = null;
       });
 
-      this.time.addEvent({ delay: 1250, loop: true, callback: () => this.spawnWave() });
-      this.applyLanceLook();
+      this.time.addEvent({ delay: 1180, loop: true, callback: () => this.spawnWave() });
+      this.applyRileyLook();
     }
 
     startTapTutorial() {
-      this.tapPromptUntil = this.time.now + TUTORIAL_MS;
-      this.prompt.setText("TAP TO HOP").setAlpha(1);
+      this.prompt.setText("TAP TO KICK").setAlpha(1);
       this.finger.setAlpha(1);
       this.fingerTween.play();
       this.tweens.add({
@@ -569,7 +669,7 @@
         repeat: 6,
       });
       this.time.delayedCall(TUTORIAL_MS, () => {
-        if (this.prompt.text === "TAP TO HOP") this.fadePrompt();
+        if (this.prompt.text === "TAP TO KICK") this.fadePrompt();
         this.tweens.add({
           targets: this.finger,
           alpha: 0,
@@ -585,11 +685,11 @@
 
     flashPrompt(text, holdMs = 2200) {
       if (this.dead || !this.showTutorial) return;
-      if (this.runMs < TUTORIAL_MS && text !== "TAP TO HOP") {
+      if (this.runMs < TUTORIAL_MS && text !== "TAP TO KICK") {
         this.time.delayedCall(TUTORIAL_MS - this.runMs + 80, () => this.flashPrompt(text, holdMs));
         return;
       }
-      if (text !== "TAP TO HOP") {
+      if (text !== "TAP TO KICK") {
         this.tweens.add({
           targets: this.finger,
           alpha: 0,
@@ -626,137 +726,176 @@
       });
     }
 
-    hop() {
+    power() {
+      return (this.saidin + this.saidar) * 0.5;
+    }
+
+    kickDuration() {
+      const fire = this.fireKick > 0 ? 1.25 : 1;
+      return KICK_BASE_MS * this.kickSpeed * fire;
+    }
+
+    kick() {
       if (this.dead) return;
       this.didTap = true;
       this.maybeLearn();
-      const power = this.fullness < 0.2 ? 0.42 : 1;
-      this.lance.setVelocityY(-260 * power);
-      this.spendFuel(0.055);
-      this.tootCount += 1;
-      this.jetting = true;
-      this.time.delayedCall(200, () => { if (!this.holdToot) this.jetting = false; });
-      this.greenPuff();
-      AudioKit.beep("toot");
+      if (this.lightningArmed || this.saidin >= LIGHTNING_NEED) {
+        this.castLightning();
+      }
+      const hop = this.hopBoost > 0 ? 1.28 : 1;
+      this.riley.setVelocityY(-270 * hop);
+      this.kicking = true;
+      this.kickUntil = this.time.now + this.kickDuration();
+      this.kickCount += 1;
+      this.kickSlash();
+      AudioKit.beep("kick");
     }
 
     holdJet(dt) {
       if (this.dead) return;
       if (this.time.now - this.pointerDownAt < HOLD_JET_MS) return;
-
-      const power = this.fullness < 0.2 ? 0.34 : 1;
-      this.lance.setVelocityY(this.lance.body.velocity.y - 980 * power * (dt / 1000));
-      this.spendFuel(0.16 * (dt / 1000));
-      this.jetting = true;
+      const hop = this.hopBoost > 0 ? 1.2 : 1;
+      this.riley.setVelocityY(this.riley.body.velocity.y - 980 * hop * (dt / 1000));
       this.jetSfx -= dt;
       if (this.jetSfx <= 0) {
         AudioKit.beep("jet");
         this.jetSfx = 90;
-        this.greenPuff(0.7);
       }
     }
 
     doDive() {
       if (this.dead) return;
-      this.lance.setVelocityY(Math.max(this.lance.body.velocity.y, 0) + 280);
+      this.riley.setVelocityY(Math.max(this.riley.body.velocity.y, 0) + 280);
       this.dive = true;
+      this.kicking = true;
+      this.kickUntil = Math.max(this.kickUntil, this.time.now + 220);
       this.time.delayedCall(180, () => { this.dive = false; });
     }
 
-    spendFuel(amount) {
-      this.fullness = Math.max(0, this.fullness - amount);
+    addSaidin(n) {
+      this.saidin = Math.min(1, this.saidin + n);
     }
 
-    addFuel(amount) {
-      this.fullness = Math.min(1.16, this.fullness + amount);
+    addSaidar(n) {
+      this.saidar = Math.min(1, this.saidar + n);
     }
 
     maybeLearn() {
-      if (this.didTap && this.didEat) markLearned();
+      if (this.didTap && this.didKickEnemy) markLearned();
     }
 
-    greenPuff(scale = 1) {
-      const puff = this.add.image(this.lance.x - 96, this.lance.y + 36, "cloud")
-        .setScale(0.42 * scale)
-        .setAlpha(0.9)
-        .setTint(0x7dff6a)
-        .setDepth(4);
+    kickSlash() {
+      const slash = this.add.image(this.riley.x + 120, this.riley.y + 10, "slash")
+        .setScale(this.fireKick > 0 ? 1.15 : 0.82)
+        .setAlpha(0.92)
+        .setDepth(9)
+        .setTint(this.fireKick > 0 ? 0xff8844 : 0xfff1b0);
       this.tweens.add({
-        targets: puff,
-        x: puff.x - 130,
+        targets: slash,
+        x: slash.x + 90,
         alpha: 0,
-        scale: 0.85 * scale,
-        duration: 400,
-        onComplete: () => puff.destroy(),
+        scale: 1.25,
+        duration: 280,
+        onComplete: () => slash.destroy(),
+      });
+    }
+
+    castLightning() {
+      this.lightningArmed = false;
+      this.lightningFlash = 420;
+      this.saidin = Math.max(0.16, this.saidin - 0.62);
+      this.saidar = Math.max(0.12, this.saidar - 0.18);
+      AudioKit.beep("lightning");
+      this.cameras.main.flash(220, 220, 240, 255);
+      this.cameras.main.shake(180, 0.006);
+      this.flashWarn("Callandor crackles!", 1600);
+      let n = 0;
+      const zap = (group) => {
+        group.children.iterate((child) => {
+          if (!child || !child.active) return;
+          n += 1;
+          this.drawBolt(this.riley.x + 40, this.riley.y - 20, child.x, child.y);
+          child.destroy();
+        });
+      };
+      zap(this.trollocs);
+      zap(this.hazards);
+      this.trollocsDown += n;
+      this.score += n * 40 + 80;
+      this.floatLabel(this.riley.x, this.riley.y - 90, `LIGHTNING ×${n}`);
+    }
+
+    drawBolt(x1, y1, x2, y2) {
+      const g = this.add.graphics().setDepth(18);
+      g.lineStyle(4, 0xfff6b0, 1);
+      g.beginPath();
+      g.moveTo(x1, y1);
+      const steps = 6;
+      for (let i = 1; i <= steps; i += 1) {
+        const t = i / steps;
+        g.lineTo(
+          x1 + (x2 - x1) * t + Phaser.Math.Between(-18, 18),
+          y1 + (y2 - y1) * t + Phaser.Math.Between(-12, 12),
+        );
+      }
+      g.strokePath();
+      this.tweens.add({
+        targets: g,
+        alpha: 0,
+        duration: 280,
+        onComplete: () => g.destroy(),
       });
     }
 
     spawnWave() {
       if (this.dead) return;
       const safe = this.runMs < SAFE_MS;
-      const yFood = this.nextFoodY();
-      const foodN = this.foods.countActive(true);
+      const y = this.nextLaneY();
+      const trollN = this.trollocs.countActive(true);
 
       if (safe) {
-        if (foodN < MAX_FOOD) this.spawnFood(yFood, false);
-        if (foodN < 2 && Math.random() < 0.25) {
-          this.spawnFood(Phaser.Math.Clamp(yFood + Phaser.Math.Between(-80, 80), 190, 500), false);
-        }
+        if (trollN < MAX_TROLLOCS) this.spawnTrolloc(y);
         return;
       }
 
       const roll = Math.random();
-      if (roll < 0.62) {
-        if (foodN < MAX_FOOD) this.spawnFood(yFood, true);
+      if (roll < 0.58) {
+        if (trollN < MAX_TROLLOCS) this.spawnTrolloc(y);
       } else if (roll < 0.7) {
-        this.spawnItem(this.pickups, "stud", yFood, 0.42, { hit: 1.05 });
+        this.spawnItem(this.pickups, "eye", y, 0.92, { hit: 1.05 });
+        this.maybePowerPrompt();
       } else if (roll < 0.8) {
-        this.spawnItem(this.doors, "door", Phaser.Math.Between(280, 470), 0.64, { hit: 0.3 });
+        this.spawnItem(this.pickups, "terangreal", Phaser.Math.Between(220, 480), 0.88, { hit: 1.05 });
+        this.maybePowerPrompt();
       } else if (roll < 0.88) {
-        const gym = this.spawnItem(this.hazards, "gym", yFood, 0.38, { hit: 0.4 });
-        this.maybeGymPrompt(gym);
+        this.spawnItem(this.pickups, "angreal", Phaser.Math.Between(220, 480), 0.9, { hit: 1.05 });
+        this.maybePowerPrompt();
       } else if (roll < 0.94) {
-        this.spawnItem(this.hazards, "seagull", Phaser.Math.Between(140, 230), 0.34, { hit: 0.38 });
+        this.spawnItem(this.hazards, "fade", Phaser.Math.Between(200, 460), 0.72, { hit: 0.42 });
       } else {
-        this.spawnItem(this.hazards, "sign", Phaser.Math.Between(220, 460), 0.42, { hit: 0.42 });
+        this.spawnItem(this.gates, "waygate", Phaser.Math.Between(280, 470), 0.7, { hit: 0.36 });
       }
     }
 
-    nextFoodY() {
+    nextLaneY() {
       this.foodLane = (this.foodLane + 1) % 5;
       const lanes = [250, 340, 420, 300, 480];
       return Phaser.Math.Clamp(lanes[this.foodLane] + Phaser.Math.Between(-24, 24), 170, 560);
     }
 
-    spawnFood(y, allowFroyo) {
-      const r = Math.random();
-      let kind;
-      if (allowFroyo && r < 0.18) kind = "froyo";
-      else if (r < 0.3) kind = "spaghetti";
-      else if (r < 0.48) kind = "poi";
-      else if (r < 0.66) kind = "musubi";
-      else if (r < 0.84) kind = "pineapple";
-      else kind = "chocolate";
-      const scale = kind === "froyo" ? this.froyoScale() : 0.74;
-      const item = this.spawnItem(this.foods, kind, y, scale, { hit: kind === "froyo" ? 0.88 : 1.4 });
-      if (this.showTutorial && !this.shownEatPrompt && kind !== "froyo") {
-        this.shownEatPrompt = true;
-        this.flashPrompt("EAT THE BUFFET", 2600);
+    spawnTrolloc(y) {
+      const item = this.spawnItem(this.trollocs, "trolloc", y, 0.78, { hit: 0.72 });
+      if (this.showTutorial && !this.shownTrollocPrompt) {
+        this.shownTrollocPrompt = true;
+        this.flashPrompt("KICK THE TROLLOCS", 2600);
       }
       return item;
     }
 
-    froyoScale() {
-      const tex = this.textures.get("froyo");
-      const src = tex && tex.getSourceImage && tex.getSourceImage();
-      const h = src && src.height ? src.height : 842;
-      return Phaser.Math.Clamp(FROYO_H / h, 0.08, 0.55);
-    }
-
-    maybeGymPrompt(gym) {
-      if (this.showTutorial && !this.shownGymPrompt && gym) {
-        this.shownGymPrompt = true;
-        this.flashPrompt("AVOID THE GYM", 2600);
+    maybePowerPrompt() {
+      if (this.showTutorial && !this.shownPowerPrompt) {
+        this.shownPowerPrompt = true;
+        this.flashPrompt("GRAB THE ONE POWER", 2600);
       }
     }
 
@@ -774,107 +913,121 @@
       return item;
     }
 
-    onFood(lance, item) {
-      const kind = item.getData("kind");
-      if (kind === "froyo") {
-        this.onFroyo(lance, item);
+    canStrike() {
+      return this.kicking || this.lightningFlash > 0 || this.warderKickPose;
+    }
+
+    onTrolloc(_riley, item) {
+      if (this.canStrike()) {
+        this.defeatEnemy(item, 50, "KIAI!");
         return;
       }
-      const spec = FOOD[kind] || FOOD.poi;
-      item.destroy();
-      this.addFuel(spec.inflate);
-      this.score += spec.score + (spec.bonus ? 20 : 0);
-      this.eatFlash = kind === "spaghetti" ? 720 : 520;
-      this.jetting = false;
-      this.didEat = true;
-      this.maybeLearn();
-      AudioKit.beep("eat");
-      if (spec.overfill) {
-        this.squashFlash = 420;
-        this.floatLabel(lance.x, lance.y - 70, "Chocolate fountain!");
-      } else {
-        this.floatLabel(lance.x, lance.y - 70, spec.bonus ? "Fried spaghetti!" : "Yum");
-      }
+      this.takeHit(item, "A Trolloc wanted a hug. Riley offered a forehead.");
     }
 
-    onFroyo(lance, item) {
-      item.destroy();
-      const alreadyEmpty = this.fullness <= FROYO_EMPTY;
-      this.froyoEaten += 1;
-      this.spendFuel(FROYO_DRAIN);
-      this.froyoWobble = 900;
-      this.froyoLook = 1400;
-      this.squashFlash = 640;
-      this.eatFlash = 0;
-      this.jetting = false;
-      this.didEat = true;
-      this.maybeLearn();
-      this.scroll = Math.max(54, this.scroll * 0.62);
-      this.floatLabel(lance.x, lance.y - 70, "Froyo?! Gross.");
-      this.flashWarn("Lance hates frozen yogurt!", 2000);
-      AudioKit.beep("bleh");
-      this.cameras.main.shake(180, 0.004);
-      if (this.froyoEaten >= 2) {
-        this.die("Two cups of frozen yogurt. The gym just sent a calendar invite.");
+    onHazard(_riley, item) {
+      if (this.canStrike() && this.kicking) {
+        this.defeatEnemy(item, 90, "Fade down!");
         return;
       }
-      if (alreadyEmpty || this.fullness <= 0.02) {
-        this.die("Pancake whale. Should've skipped the frozen yogurt.");
+      this.takeHit(item, "The Fade asked for silence. Riley answered with a kick… almost.");
+    }
+
+    defeatEnemy(item, points, label) {
+      item.destroy();
+      this.trollocsDown += 1;
+      this.score += points;
+      this.addSaidin(0.035);
+      this.didKickEnemy = true;
+      this.maybeLearn();
+      AudioKit.beep("hit");
+      this.floatLabel(this.riley.x, this.riley.y - 70, label);
+    }
+
+    takeHit(item, reason) {
+      if (this.invuln > 0 || this.shieldMs > 0) {
+        if (this.shieldMs > 0 && item && item.active) item.destroy();
+        return;
       }
-    }
-
-    onStud(lance, item) {
-      item.destroy();
-      this.studs += 1;
-      this.score += 160;
-      AudioKit.beep("stud");
-      this.floatLabel(lance.x, lance.y - 80, "STUD +160");
-    }
-
-    onHazard(lance, item) {
-      if (this.invuln > 0) return;
-      const kind = item.getData("kind");
-      item.destroy();
+      if (item && item.active) item.destroy();
       if (!this.freeHitUsed) {
         this.freeHitUsed = true;
         this.invuln = 1400;
-        this.lance.setVelocityY(-180);
-        this.lance.x = Math.max(180, this.lance.x - 36);
-        this.floatLabel(lance.x, lance.y - 60, "oof");
-        this.flashWarn("oof — still swimming!", 1600);
+        this.riley.setVelocityY(-180);
+        this.riley.x = Math.max(180, this.riley.x - 36);
+        this.floatLabel(this.riley.x, this.riley.y - 60, "oof");
+        this.flashWarn("oof — still kicking!", 1600);
         this.cameras.main.flash(180, 255, 230, 180);
         AudioKit.beep("oof");
         return;
       }
-      const reasons = {
-        gym: "The gym asked for one sit-up. Lance offered a hug instead.",
-        seagull: "A seagull wanted leftovers. Lance shared… with his forehead.",
-        sign: "The No Farting sign asked nicely. Lance saluted and sat this one out.",
-      };
-      this.die(reasons[kind] || "Bonk. The buffet will keep a plate warm.");
+      this.die(reason);
     }
 
-    onDoor(lance, item) {
-      if (this.fullness < PUFFY) {
-        this.puffyWarned = false;
+    onPickup(_riley, item) {
+      const kind = item.getData("kind");
+      item.destroy();
+      AudioKit.beep("power");
+      if (kind === "eye") {
+        this.addSaidin(0.3);
+        this.addSaidar(0.3);
+        this.score += 80;
+        this.floatLabel(this.riley.x, this.riley.y - 80, "Eye of the World!");
+        this.flashWarn("Pure saidin and saidar!", 1800);
+      } else if (kind === "angreal") {
+        this.kickSpeed = Math.min(2.15, this.kickSpeed + 0.22);
+        this.addSaidin(0.08);
+        this.score += 60;
+        this.floatLabel(this.riley.x, this.riley.y - 80, "Angreal — faster kicks!");
+      } else if (kind === "terangreal") {
+        this.score += 55;
+        this.addSaidar(0.1);
+        this.rollTerangreal();
+      }
+    }
+
+    rollTerangreal() {
+      const pick = Phaser.Utils.Array.GetRandom(TERANGREAL);
+      this.floatLabel(this.riley.x, this.riley.y - 80, pick.label);
+      if (pick.id === "shield") {
+        this.shieldMs = pick.ms;
+        this.invuln = Math.max(this.invuln, pick.ms);
+        this.flashWarn("Air shield holds!", 1600);
+      } else if (pick.id === "slow") {
+        this.slowWeave = pick.ms;
+        this.flashWarn("The Pattern slows…", 1600);
+      } else if (pick.id === "fire") {
+        this.fireKick = pick.ms;
+        this.flashWarn("Kicks burn brighter!", 1600);
+      } else if (pick.id === "hop") {
+        this.hopBoost = pick.ms;
+        this.flashWarn("Folded air underfoot!", 1600);
+      } else if (pick.id === "heal") {
+        this.freeHitUsed = false;
+        this.flashWarn("The Power mends a bruise.", 1600);
+      }
+    }
+
+    onGate(_riley, item) {
+      if (this.saidin >= 0.38) {
+        this.gateWarned = false;
         return;
       }
       const now = this.time.now;
-      if (!this.puffyWarned) {
-        this.puffyWarned = true;
-        this.doorWarnUntil = now + DOOR_WARN_MS;
-        item.setData("warned", true);
-        this.bounceDoor(item);
-        this.flashWarn("Too full — toot to shrink!", 1600);
+      if (!this.gateWarned) {
+        this.gateWarned = true;
+        this.gateWarnUntil = now + WAYGATE_WARN_MS;
+        this.bounceGate(item);
+        this.flashWarn("Too little of the Power — gather saidin!", 1600);
         return;
       }
-      if (now < this.doorWarnUntil) return;
-      this.die("Too puffy for the cabin door. A polite toot and he'll slip right through.");
+      if (now < this.gateWarnUntil) return;
+      this.die("The Waygate wanted more of the One Power than Riley had on hand.");
     }
 
-    bounceDoor(item) {
-      this.lance.setVelocityY(-80);
-      this.lance.x = Math.max(170, this.lance.x - 48);
+    bounceGate(item) {
+      this.riley.setVelocityY(-80);
+      this.riley.x = Math.max(170, this.riley.x - 48);
       if (item && item.body) item.setVelocityX(-(this.scroll + 8));
       AudioKit.beep("oof");
     }
@@ -896,129 +1049,129 @@
       });
     }
 
-    applyLanceLook() {
-      const f = Phaser.Math.Clamp(this.fullness, 0, 1.16);
-      let key = "idleInflated";
-      if (this.froyoLook > 0 || f <= 0.02) key = "idleDeflated";
-      else if (this.eatFlash > 0) key = "eatLance";
-      else if (this.jetting) key = "fartBlast";
-      else if (f < 0.38) key = "idleDeflated";
-      if (this.lance.texture.key !== key) this.lance.setTexture(key);
-
-      const t = Phaser.Math.Clamp(f, 0, 1);
-      const over = Math.max(0, f - PUFFY);
-      let sx;
-      let sy;
-      if (key === "idleDeflated") {
-        sx = 0.58;
-        sy = 0.7;
-      } else {
-        sx = Phaser.Math.Linear(0.46, 0.58, t) + over * 0.22;
-        sy = Phaser.Math.Linear(0.46, 0.6, t) + over * 0.18;
-      }
-      if (this.squashFlash > 0) {
-        sx *= this.froyoLook > 0 ? 0.78 : 1.18;
-        sy *= this.froyoLook > 0 ? 0.52 : 0.74;
-      }
-      if (this.froyoWobble > 0) {
-        const wob = Math.sin(this.runMs / 40) * 0.06;
-        sx *= 1 + wob;
-        sy *= 1 - wob;
-        this.lance.setAngle(Math.sin(this.runMs / 50) * 8);
-      } else {
-        this.lance.setAngle(0);
-      }
+    applyRileyLook() {
+      const key = this.kicking ? "rileyKick" : "rileyIdle";
+      if (this.riley.texture.key !== key) this.riley.setTexture(key);
+      let sx = key === "rileyKick" ? 0.62 : 0.7;
+      let sy = key === "rileyKick" ? 0.62 : 0.7;
       if (this.dive) sy *= 0.86;
-      this.lance.setScale(sx, sy);
+      if (this.fireKick > 0) {
+        sx *= 1.06;
+        sy *= 1.06;
+      }
+      this.riley.setScale(sx, sy);
+      const bw = key === "rileyKick" ? 110 : 88;
+      const bh = 110;
+      this.riley.body.setSize(bw, bh);
+      this.riley.body.setOffset((this.riley.width - bw) / 2, (this.riley.height - bh) / 2);
 
-      const bw = 88 + t * 46 + over * 36;
-      const bh = 64 + t * 58 + over * 28;
-      this.lance.body.setSize(bw, bh);
-      this.lance.body.setOffset((this.lance.width - bw) / 2, (this.lance.height - bh) / 2);
+      const ready = this.saidin >= LIGHTNING_NEED;
+      this.lightningArmed = ready;
+      this.meterFill.width = 504 * Math.max(0.04, Phaser.Math.Clamp(this.saidin, 0, 1));
+      this.meterFill.setFillStyle(ready ? 0xffe27a : this.saidin < 0.25 ? 0x7aa0c8 : 0x6ec8ff);
+      this.meterLabel.setText(ready ? "LIGHTNING READY" : "SAIDIN");
 
-      const meterT = Phaser.Math.Clamp(f, 0, 1);
-      this.meterFill.width = 504 * Math.max(0.04, meterT);
-      this.meterFill.setFillStyle(f > PUFFY ? 0xff5b7a : f < 0.2 ? 0xf0d35a : 0x7ad36a);
-      this.meterLabel.setText("BUFFET FUEL");
-      if (f > PUFFY && !this.shownPuffyHint) {
-        this.shownPuffyHint = true;
-        this.flashWarn("Too full — toot to shrink!", 2600);
+      if (this.power() >= WARDER_NEED && !this.warderOn) {
+        this.warderOn = true;
+        this.flashWarn("A Warder joins the kick!", 1800);
+        this.tweens.add({ targets: this.warder, alpha: 1, duration: 400 });
+      }
+      if (this.power() < WARDER_NEED - 0.12 && this.warderOn) {
+        this.warderOn = false;
+        this.tweens.add({ targets: this.warder, alpha: 0, duration: 300 });
       }
     }
 
-    magnetFoods(dt) {
-      this.foods.children.iterate((food) => {
-        if (!food || !food.active) return;
-        if (food.getData("kind") === "froyo") return;
-        const dx = this.lance.x - food.x;
-        const dy = this.lance.y - food.y;
+    magnetKicks(dt) {
+      if (!this.kicking) return;
+      const range = KICK_MAGNET * (this.fireKick > 0 ? 1.25 : 1);
+      this.trollocs.children.iterate((foe) => {
+        if (!foe || !foe.active) return;
+        const dx = (this.riley.x + 70) - foe.x;
+        const dy = this.riley.y - foe.y;
         const dist = Math.hypot(dx, dy);
-        if (dist < FOOD_MAGNET && dist > 8) {
-          const pull = ((FOOD_MAGNET - dist) / FOOD_MAGNET) * 210 * (dt / 1000);
-          food.x += (dx / dist) * pull;
-          food.y += (dy / dist) * pull;
+        if (dist < range && dist > 8) {
+          const pull = ((range - dist) / range) * 240 * (dt / 1000);
+          foe.x += (dx / dist) * pull;
+          foe.y += (dy / dist) * pull;
         }
       });
     }
 
+    tickWarder() {
+      const targetX = this.riley.x - 108;
+      const targetY = this.riley.y + 8;
+      this.warder.x += (targetX - this.warder.x) * 0.18;
+      this.warder.y += (targetY - this.warder.y) * 0.18;
+      if (!this.warderOn) return;
+      if (this.time.now < this.warderKickAt) return;
+      this.warderKickAt = this.time.now + Math.max(260, 420 / this.kickSpeed);
+      let best = null;
+      let bestD = 190;
+      this.trollocs.children.iterate((foe) => {
+        if (!foe || !foe.active) return;
+        const d = Math.hypot(foe.x - this.warder.x, foe.y - this.warder.y);
+        if (d < bestD) {
+          best = foe;
+          bestD = d;
+        }
+      });
+      if (best) {
+        this.warderKickPose = true;
+        this.defeatEnemy(best, 40, "Warder!");
+        this.time.delayedCall(140, () => { this.warderKickPose = false; });
+      }
+    }
+
     softBounds() {
-      if (this.lance.y > FLOOR_Y) {
-        this.lance.y = FLOOR_Y;
-        const vy = this.lance.body.velocity.y;
-        this.lance.setVelocityY(vy > 40 ? -vy * 0.3 : Math.min(vy, 0));
+      if (this.riley.y > FLOOR_Y) {
+        this.riley.y = FLOOR_Y;
+        const vy = this.riley.body.velocity.y;
+        this.riley.setVelocityY(vy > 40 ? -vy * 0.3 : Math.min(vy, 0));
       }
-      if (this.lance.y < CEIL_Y) {
-        this.lance.y = CEIL_Y;
-        const vy = this.lance.body.velocity.y;
-        this.lance.setVelocityY(vy < -40 ? -vy * 0.3 : Math.max(vy, 0));
+      if (this.riley.y < CEIL_Y) {
+        this.riley.y = CEIL_Y;
+        const vy = this.riley.body.velocity.y;
+        this.riley.setVelocityY(vy < -40 ? -vy * 0.3 : Math.max(vy, 0));
       }
-      this.lance.x += (LANCE_X - this.lance.x) * 0.08;
-      this.lance.setVelocityX(0);
+      this.riley.x += (RILEY_X - this.riley.x) * 0.08;
+      this.riley.setVelocityX(0);
     }
 
     update(_t, dt) {
       if (this.dead) return;
       this.runMs += dt;
       this.invuln = Math.max(0, this.invuln - dt);
-      this.froyoWobble = Math.max(0, this.froyoWobble - dt);
-      this.froyoLook = Math.max(0, this.froyoLook - dt);
+      this.fireKick = Math.max(0, this.fireKick - dt);
+      this.slowWeave = Math.max(0, this.slowWeave - dt);
+      this.hopBoost = Math.max(0, this.hopBoost - dt);
+      this.shieldMs = Math.max(0, this.shieldMs - dt);
+      this.lightningFlash = Math.max(0, this.lightningFlash - dt);
+
+      if (this.time.now >= this.kickUntil) this.kicking = false;
 
       const spaceDown = this.cursors.space.isDown;
-      if (spaceDown) this.holdToot = true;
-      if (spaceDown || this.holdToot) this.holdJet(dt);
-      else this.jetting = this.eatFlash > 0 ? this.jetting : false;
+      if (spaceDown) this.holdBoost = true;
+      if (spaceDown || this.holdBoost) this.holdJet(dt);
 
-      this.eatFlash = Math.max(0, this.eatFlash - dt);
-      this.squashFlash = Math.max(0, this.squashFlash - dt);
-
-      if (this.fullness <= 0) {
-        if (!this.emptySince) this.emptySince = this.time.now;
-        if (this.time.now - this.emptySince >= PANCAKE_LOSE_MS) {
-          this.die("Pancake whale. Should've skipped the frozen yogurt.");
-          return;
-        }
-      } else {
-        this.emptySince = 0;
-      }
-
-      if (this.fullness < PUFFY) this.puffyWarned = false;
-      if (this.puffyWarned && this.time.now >= this.doorWarnUntil && this.fullness >= PUFFY) {
+      if (this.saidin >= 0.38) this.gateWarned = false;
+      if (this.gateWarned && this.time.now >= this.gateWarnUntil && this.saidin < 0.38) {
         let stuck = false;
-        this.doors.children.iterate((door) => {
-          if (door && door.active && this.physics.overlap(this.lance, door)) stuck = true;
+        this.gates.children.iterate((gate) => {
+          if (gate && gate.active && this.physics.overlap(this.riley, gate)) stuck = true;
         });
         if (stuck) {
-          this.die("Too puffy for the cabin door. A polite toot and he'll slip right through.");
+          this.die("The Waygate wanted more of the One Power than Riley had on hand.");
           return;
         }
       }
 
       const targetY = 348 + Math.sin(this.runMs / 520) * 22;
-      this.lance.body.velocity.y += (targetY - this.lance.y) * 0.055;
+      this.riley.body.velocity.y += (targetY - this.riley.y) * 0.055;
 
       const ramp = Math.min(92, this.runMs / 1000 * 1.15);
-      const wobbleSlow = this.froyoWobble > 0 ? 0.72 : 1;
-      this.scroll = (86 + ramp) * wobbleSlow;
+      const slow = this.slowWeave > 0 ? 0.58 : 1;
+      this.scroll = (86 + ramp) * slow;
       this.distance += (this.scroll * dt) / 1000;
       this.score += dt * 0.018;
 
@@ -1039,16 +1192,17 @@
       wrapPair(this.bg1, this.bg2);
       wrapPair(this.rail1, this.rail2);
 
-      this.magnetFoods(dt);
+      this.magnetKicks(dt);
+      this.tickWarder();
       this.softBounds();
-      this.applyLanceLook();
-      this.sweep(this.foods);
+      this.applyRileyLook();
+      this.sweep(this.trollocs);
       this.sweep(this.hazards);
       this.sweep(this.pickups);
-      this.sweep(this.doors);
+      this.sweep(this.gates);
 
-      if (this.invuln > 0) this.lance.setAlpha(0.55 + 0.45 * Math.sin(this.runMs / 40));
-      else this.lance.setAlpha(1);
+      if (this.invuln > 0 || this.shieldMs > 0) this.riley.setAlpha(0.55 + 0.45 * Math.sin(this.runMs / 40));
+      else this.riley.setAlpha(1);
 
       this.scoreText.setText(`Score ${Math.floor(this.score)}`);
       this.syncScrollVelocities();
@@ -1065,10 +1219,10 @@
           if (child && child.body) child.setVelocityX(vx);
         });
       };
-      setVx(this.foods);
+      setVx(this.trollocs);
       setVx(this.hazards);
       setVx(this.pickups);
-      setVx(this.doors);
+      setVx(this.gates);
     }
 
     sweep(group) {
@@ -1081,19 +1235,19 @@
       if (this.dead) return;
       this.dead = true;
       AudioKit.beep("bonk");
-      this.lance.setVelocity(0, 0);
-      this.lance.body.allowGravity = false;
-      this.foods.setVelocityX(0);
+      this.riley.setVelocity(0, 0);
+      this.riley.body.allowGravity = false;
+      this.trollocs.setVelocityX(0);
       this.hazards.setVelocityX(0);
       this.pickups.setVelocityX(0);
-      this.doors.setVelocityX(0);
+      this.gates.setVelocityX(0);
 
       const prevLast = loadScores().last;
       const run = {
         score: Math.floor(this.score),
         distance: Math.floor(this.distance),
-        toots: this.tootCount,
-        studs: this.studs,
+        kicks: this.kickCount,
+        trollocs: this.trollocsDown,
         reason,
         prevLast: prevLast ? prevLast.score : null,
       };
@@ -1110,15 +1264,29 @@
       this.run = run;
       this.phase = "over";
       this.layer = this.add.container(0, 0).setDepth(40);
-      this.blocker = this.add.rectangle(W / 2, H / 2, W, H, 0x041824, 0.55)
+      this.blocker = this.add.rectangle(W / 2, H / 2, W, H, 0x120818, 0.55)
         .setInteractive()
         .setDepth(39);
 
-      const { best } = loadScores();
-      const hi = run.score >= best && run.score > 0 ? "  ★ new best!" : "";
-      const lastLine = run.prevLast == null ? "Last — first cruise!" : `Last ${run.prevLast}`;
+      this.drawOverCard(true);
+      this.overTimer = this.time.delayedCall(2400, () => this.showCredits());
+      this.input.keyboard.on("keydown-SPACE", this.onSpace, this);
+      this.input.keyboard.on("keydown-ENTER", this.onSpace, this);
+      this.time.delayedCall(450, () => {
+        this.input.on("pointerdown", this.onTap, this);
+      });
+      this.events.once("shutdown", () => {
+        if (this.creditsOverlay && this.creditsOverlay.done) this.creditsOverlay.done();
+        sweepHtmlVideos();
+      });
+    }
 
-      this.layer.add(this.add.rectangle(W / 2, H / 2, 680, 420, 0x123a52, 0.94).setStrokeStyle(5, 0xffe08a));
+    drawOverCard(first) {
+      const { best } = loadScores();
+      const run = this.run;
+      const hi = run.score >= best && run.score > 0 ? "  ★ new best!" : "";
+      const lastLine = run.prevLast == null ? "Last — first Pattern!" : `Last ${run.prevLast}`;
+      this.layer.add(this.add.rectangle(W / 2, H / 2, 680, 420, 0x1a1430, 0.94).setStrokeStyle(5, 0xffe08a));
       this.layer.add(this.add.text(W / 2, 210, "GAME OVER", {
         fontFamily: "Impact, Georgia, serif",
         fontSize: "56px",
@@ -1131,62 +1299,40 @@
         align: "center",
         wordWrap: { width: 600 },
       }).setOrigin(0.5));
-      this.layer.add(this.add.text(W / 2, 400, `Score ${run.score}${hi}\nBest ${best}\n${lastLine}`, {
+      this.layer.add(this.add.text(W / 2, 400, first
+        ? `Score ${run.score}${hi}\nBest ${best}\n${lastLine}`
+        : `Score ${run.score}${hi}   ·   Best ${best}`, {
         fontFamily: "Trebuchet MS, sans-serif",
-        fontSize: "26px",
+        fontSize: first ? "26px" : "24px",
         color: "#e8f6ff",
         align: "center",
         lineSpacing: 8,
       }).setOrigin(0.5));
-
-      this.overTimer = this.time.delayedCall(1600, () => this.showCutscene());
-      this.input.keyboard.on("keydown-SPACE", this.onSpace, this);
-      this.input.keyboard.on("keydown-ENTER", this.onSpace, this);
-      this.input.on("pointerdown", this.onTap, this);
     }
 
     onSpace() {
-      if (this.phase === "over") this.showCutscene();
-      else if (this.phase === "cutscene") this.showMenu();
+      if (this.phase === "over") this.showCredits();
+      else if (this.phase === "credits") this.showMenu();
       else if (this.phase === "menu") this.goRetry();
     }
 
-    onTap(p) {
-      if (this.phase === "over") this.showCutscene();
-      else if (this.phase === "cutscene") this.showMenu();
+    onTap() {
+      if (this.phase === "over") this.showCredits();
+      else if (this.phase === "credits") this.showMenu();
     }
 
     clearLayer() {
       this.layer.removeAll(true);
     }
 
-    showCutscene() {
+    showCredits() {
       if (this.phase !== "over") return;
-      this.phase = "cutscene";
+      this.phase = "credits";
       if (this.overTimer) this.overTimer.remove(false);
       this.clearLayer();
-      this.blocker.setFillStyle(0x041824, 0.15);
+      this.blocker.setFillStyle(0x120818, 0.15);
 
-      if (this.textures.exists("cutsceneGym")) {
-        this.layer.add(this.add.image(W / 2, H / 2, "cutsceneGym").setDisplaySize(W, H));
-      } else {
-        this.composeGymFallback();
-      }
-
-      this.layer.add(this.add.rectangle(W / 2, H - 78, W, 156, 0x041018, 0.55));
-      this.layer.add(this.add.text(W / 2, H - 104, "Back to the gym, pops.", {
-        fontFamily: "Impact, Georgia, serif",
-        fontSize: "36px",
-        color: "#fff4c8",
-        stroke: "#3a1a10",
-        strokeThickness: 6,
-      }).setOrigin(0.5));
-      this.layer.add(this.add.text(W / 2, H - 56, "The froyo is not a protein, Lance.", {
-        fontFamily: "Georgia, serif",
-        fontSize: "24px",
-        fontStyle: "italic",
-        color: "#ffe7d0",
-      }).setOrigin(0.5));
+      this.creditsOverlay = attachVideoOverlay("assets/credits.mp4", () => this.showMenu());
 
       const skip = this.add.text(W - 28, 22, "SKIP", {
         fontFamily: "Impact, sans-serif",
@@ -1200,76 +1346,29 @@
         this.showMenu();
       });
       this.layer.add(skip);
-
-      this.cutTimer = this.time.delayedCall(6500, () => this.showMenu());
-    }
-
-    composeGymFallback() {
-      this.layer.add(this.add.rectangle(W / 2, H / 2, W, H, 0x3d2a22, 1));
-      if (this.textures.exists("bg")) {
-        this.layer.add(this.add.image(W / 2, H / 2, "bg").setDisplaySize(W, H).setAlpha(0.35));
-      }
-      if (this.textures.exists("gym")) {
-        this.layer.add(this.add.image(210, 520, "gym").setScale(1.15));
-        this.layer.add(this.add.image(1080, 500, "gym").setScale(0.9));
-      }
-      if (this.textures.exists("titleLance")) {
-        this.layer.add(this.add.image(430, 390, "titleLance").setScale(0.58));
-      }
-      const g = this.add.graphics();
-      g.fillStyle(0xc68642, 1);
-      g.fillCircle(900, 168, 46);
-      g.fillStyle(0xd4a574, 1);
-      g.fillRoundedRect(820, 210, 160, 220, 20);
-      g.fillStyle(0xe8b86a, 1);
-      g.fillRoundedRect(760, 230, 70, 160, 24);
-      g.fillRoundedRect(970, 230, 70, 160, 24);
-      g.fillStyle(0xc23b3b, 1);
-      g.fillRoundedRect(836, 214, 128, 90, 12);
-      g.fillStyle(0x2b2b2b, 1);
-      g.fillRoundedRect(848, 400, 110, 36, 8);
-      this.layer.add(g);
+      this.cutTimer = this.time.delayedCall(12500, () => this.showMenu());
     }
 
     showMenu() {
       if (this.phase === "menu") return;
       this.phase = "menu";
       if (this.cutTimer) this.cutTimer.remove(false);
+      if (this.creditsOverlay && this.creditsOverlay.done) this.creditsOverlay.done();
+      this.creditsOverlay = null;
+      sweepHtmlVideos();
       this.clearLayer();
-      this.blocker.setFillStyle(0x041824, 0.55);
+      this.blocker.setFillStyle(0x120818, 0.55);
+      this.drawOverCard(false);
 
-      const { best } = loadScores();
-      const run = this.run;
-      const hi = run.score >= best && run.score > 0 ? "  ★ new best!" : "";
-
-      this.layer.add(this.add.rectangle(W / 2, H / 2, 680, 420, 0x123a52, 0.94).setStrokeStyle(5, 0xffe08a));
-      this.layer.add(this.add.text(W / 2, 210, "GAME OVER", {
-        fontFamily: "Impact, Georgia, serif",
-        fontSize: "56px",
-        color: "#fff2c4",
-      }).setOrigin(0.5));
-      this.layer.add(this.add.text(W / 2, 286, run.reason, {
-        fontFamily: "Georgia, serif",
-        fontSize: "22px",
-        color: "#ffe7d0",
-        align: "center",
-        wordWrap: { width: 600 },
-      }).setOrigin(0.5));
-      this.layer.add(this.add.text(W / 2, 360, `Score ${run.score}${hi}   ·   Best ${best}`, {
-        fontFamily: "Trebuchet MS, sans-serif",
-        fontSize: "24px",
-        color: "#e8f6ff",
-      }).setOrigin(0.5));
-
-      const retry = this.add.rectangle(W / 2 - 140, 460, 240, 72, 0xe31c3d)
+      const retry = this.add.rectangle(W / 2 - 140, 460, 240, 72, 0xc9a227)
         .setStrokeStyle(4, 0xfff1b0)
         .setInteractive({ useHandCursor: true });
       const retryTxt = this.add.text(W / 2 - 140, 460, "RETRY", {
         fontFamily: "Impact, sans-serif",
         fontSize: "36px",
-        color: "#fff8e0",
+        color: "#1a1208",
       }).setOrigin(0.5);
-      const title = this.add.rectangle(W / 2 + 140, 460, 240, 72, 0x1b6b8a)
+      const title = this.add.rectangle(W / 2 + 140, 460, 240, 72, 0x3a2a62)
         .setStrokeStyle(4, 0xfff1b0)
         .setInteractive({ useHandCursor: true });
       const titleTxt = this.add.text(W / 2 + 140, 460, "TITLE", {
@@ -1289,12 +1388,18 @@
     }
 
     goRetry() {
+      if (this.creditsOverlay && this.creditsOverlay.done) this.creditsOverlay.done();
+      this.creditsOverlay = null;
+      sweepHtmlVideos();
       this.scene.stop("over");
       this.scene.stop("play");
       this.scene.start("play");
     }
 
     goTitle() {
+      if (this.creditsOverlay && this.creditsOverlay.done) this.creditsOverlay.done();
+      this.creditsOverlay = null;
+      sweepHtmlVideos();
       this.scene.stop("over");
       this.scene.stop("play");
       this.scene.start("title");
@@ -1306,7 +1411,7 @@
     parent: "game",
     width: W,
     height: H,
-    backgroundColor: "#0a4d6e",
+    backgroundColor: "#120c1c",
     pixelArt: false,
     antialias: true,
     scale: {
@@ -1318,7 +1423,7 @@
       arcade: { gravity: { y: 90 }, fps: 60, debug: false },
     },
     fps: { target: 60, forceSetTimeOut: false },
-    scene: [BootScene, TitleScene, PlayScene, OverScene],
+    scene: [BootScene, IntroScene, TitleScene, PlayScene, OverScene],
     input: { activePointers: 3 },
   });
 })();
