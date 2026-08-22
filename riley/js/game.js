@@ -3,9 +3,11 @@
 
   const W = 1280;
   const H = 720;
-  const VERSION = "2.1.0";
+  const VERSION = "2.2.0";
   const SAFE_MS = 1500;
   const MAX_FOES = 10;
+  const FOE_SPAWN_X = W - 105;
+  const FOE_ENTRY_MS = 900;
   const START_HP = 3;
   const MAX_HP = 3;
   const PLAYER_BOUNDS = { minX: 125, maxX: 545, minY: 150, maxY: 565 };
@@ -24,9 +26,9 @@
   ];
 
   const FOES = {
-    trolloc: { hp: 3, score: 70, scale: 0.86, hit: 0.66, amp: 18 },
-    brute: { hp: 8, score: 165, scale: 0.92, hit: 0.7, amp: 13 },
-    fade: { hp: 6, score: 145, scale: 0.8, hit: 0.43, amp: 38 },
+    trolloc: { hp: 5, score: 90, scale: 1.03, hit: 0.66, amp: 18 },
+    brute: { hp: 11, score: 190, scale: 1.04, hit: 0.7, amp: 13 },
+    fade: { hp: 8, score: 165, scale: 0.9, hit: 0.43, amp: 38 },
   };
 
   const MUSIC_KEYS = Array.from({ length: 9 }, (_v, i) => "music" + String(i).padStart(2, "0"));
@@ -701,7 +703,8 @@
       this.createDragTutorial();
       this.setupDragInput();
       this.nextAutoFire = this.time.now + 480;
-      this.nextSpawnAt = this.time.now + 350;
+      this.spawnFoe("trolloc", 350);
+      this.nextSpawnAt = this.time.now + 750;
 
       window.TkdRiley = { version: VERSION, play: this };
       this.orientationPaused = false;
@@ -928,7 +931,7 @@
     spawnFoe(kind, y) {
       const spec = FOES[kind];
       const group = kind === "fade" ? this.hazards : this.trollocs;
-      const foe = this.spawnItem(group, kind, y, spec.scale, spec.hit);
+      const foe = this.spawnItem(group, kind, y, spec.scale, spec.hit, FOE_SPAWN_X);
       foe.setData("hp", spec.hp);
       foe.setData("maxHp", spec.hp);
       foe.setData("score", spec.score);
@@ -937,13 +940,41 @@
       foe.setData("amp", spec.amp + Math.min(18, this.runMs / 4000));
       foe.setData("telegraphing", false);
       foe.setData("attackable", false);
-      foe.setAlpha(0.78).setTint(0x79cfff);
+      foe.setData("entryUntil", this.time.now + FOE_ENTRY_MS);
+      foe.setAlpha(1).clearTint();
       const canShoot = this.runMs > 4500 && (kind === "fade" || kind === "brute");
       foe.setData("attackAt", canShoot ? this.time.now + Phaser.Math.Between(1050, 1600) : Number.POSITIVE_INFINITY);
+      const entryHalo = this.add.ellipse(
+        foe.x,
+        foe.y,
+        foe.displayWidth * 0.9,
+        foe.displayHeight * 0.96,
+        0xff6a32,
+        0.14,
+      ).setStrokeStyle(4, 0xffc45c, 0.9).setDepth(8);
+      this.tweens.add({
+        targets: entryHalo,
+        scaleX: 1.12,
+        scaleY: 1.12,
+        alpha: 0.28,
+        duration: 320,
+        yoyo: true,
+        repeat: 1,
+      });
+      foe.setData("entryHalo", entryHalo);
+      const entryLabel = this.add.text(foe.x, foe.y - foe.displayHeight * 0.58, kind.toUpperCase(), {
+        fontFamily: "Impact, sans-serif",
+        fontSize: "17px",
+        color: "#fff0b0",
+        stroke: "#180405",
+        strokeThickness: 5,
+        letterSpacing: 2,
+      }).setOrigin(0.5).setDepth(16);
+      foe.setData("entryLabel", entryLabel);
       const shadow = this.add.ellipse(foe.x, foe.y + foe.displayHeight * 0.36, foe.displayWidth * 0.62, 22, 0x000000, 0.38).setDepth(7);
       foe.setData("shadow", shadow);
-      const barBack = this.add.rectangle(foe.x, foe.y - 75, 72, 9, 0x14080a, 0.9).setDepth(14).setVisible(false);
-      const bar = this.add.rectangle(foe.x - 34, foe.y - 75, 68, 5, 0xff5c56).setOrigin(0, 0.5).setDepth(15).setVisible(false);
+      const barBack = this.add.rectangle(foe.x, foe.y - 75, 82, 11, 0x14080a, 0.92).setDepth(14).setVisible(true);
+      const bar = this.add.rectangle(foe.x - 39, foe.y - 75, 78, 7, 0xff5c56).setOrigin(0, 0.5).setDepth(15).setVisible(true);
       foe.setData("hpBarBack", barBack);
       foe.setData("hpBar", bar);
       if (kind === "fade" && !this.fadeVoice) {
@@ -956,8 +987,8 @@
       return foe;
     }
 
-    spawnItem(group, key, y, scale, hit = 1) {
-      const item = group.create(W + 60, y, key);
+    spawnItem(group, key, y, scale, hit = 1, spawnX = W + 60) {
+      const item = group.create(spawnX, y, key);
       item.setScale(scale);
       item.body.allowGravity = false;
       item.setVelocityX(this.itemSpeed());
@@ -1303,12 +1334,17 @@
           const phase = foe.getData("phase") || 0;
           const amplitude = foe.getData("amp") || 0;
           const baseY = foe.getData("baseY") || foe.y;
-          foe.y = Phaser.Math.Clamp(baseY + Math.sin(this.runMs / 520 + phase) * amplitude, 175, 545);
-          if (foe.body) foe.body.updateFromGameObject();
-          foe.setVelocityX(this.itemSpeed());
-          if (foe.getData("attackable") === false && foe.x <= W - 80) {
+          const targetY = Phaser.Math.Clamp(baseY + Math.sin(this.runMs / 520 + phase) * amplitude, 175, 545);
+          const verticalSpeed = Phaser.Math.Clamp((targetY - foe.y) * 7, -170, 170);
+          foe.setVelocity(this.itemSpeed(), verticalSpeed);
+          if (foe.getData("attackable") === false && this.time.now >= (foe.getData("entryUntil") || 0)) {
             foe.setData("attackable", true);
-            foe.setAlpha(1).clearTint();
+            const entryHalo = foe.getData("entryHalo");
+            const entryLabel = foe.getData("entryLabel");
+            if (entryHalo && entryHalo.active) entryHalo.destroy();
+            if (entryLabel && entryLabel.active) entryLabel.destroy();
+            foe.setData("entryHalo", null);
+            foe.setData("entryLabel", null);
             const entryBar = foe.getData("hpBar");
             const entryBarBack = foe.getData("hpBarBack");
             if (entryBar) entryBar.setVisible(true);
@@ -1320,12 +1356,22 @@
             shadow.x = foe.x;
             shadow.y = foe.y + foe.displayHeight * 0.36;
           }
+          const entryHalo = foe.getData("entryHalo");
+          if (entryHalo && entryHalo.active) {
+            entryHalo.x = foe.x;
+            entryHalo.y = foe.y;
+          }
+          const entryLabel = foe.getData("entryLabel");
+          if (entryLabel && entryLabel.active) {
+            entryLabel.x = foe.x;
+            entryLabel.y = foe.y - foe.displayHeight * 0.58;
+          }
           const bar = foe.getData("hpBar");
           const barBack = foe.getData("hpBarBack");
           if (bar && bar.active) {
             const hp = Math.max(0, foe.getData("hp") || 0);
             const maxHp = foe.getData("maxHp") || 1;
-            bar.x = foe.x - 34;
+            bar.x = foe.x - 39;
             bar.y = foe.y - Math.max(58, foe.displayHeight * 0.43);
             bar.setScale(hp / maxHp, 1);
           }
@@ -1382,7 +1428,7 @@
 
     cleanupObjectFx(object) {
       if (!object || !object.getData) return;
-      ["glow", "shadow", "hpBar", "hpBarBack", "telegraphRing"].forEach((key) => {
+      ["glow", "shadow", "hpBar", "hpBarBack", "telegraphRing", "entryHalo", "entryLabel"].forEach((key) => {
         const fx = object.getData(key);
         if (fx && fx.destroy) fx.destroy();
         object.setData(key, null);
