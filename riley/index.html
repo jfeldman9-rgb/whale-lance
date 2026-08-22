@@ -7,11 +7,18 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="theme-color" content="#120c1c" />
   <title>Tae Kwon Doe Riley</title>
-  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/style.css?v=2.0.0" />
 </head>
 <body>
-  <div id="game"></div>
+  <main id="game" role="application" aria-label="Tae Kwon Doe Riley arcade game"></main>
+  <aside id="rotate-overlay" role="status" aria-live="polite">
+    <div class="rotate-card">
+      <span class="rotate-device" aria-hidden="true"></span>
+      <strong>Rotate to landscape</strong>
+      <span>Riley needs room to fight.</span>
+    </div>
+  </aside>
   <script src="vendor/phaser.min.js"></script>
-  <script src="js/game.js"></script>
+  <script src="js/game.js?v=2.0.0"></script>
 </body>
 </html>
