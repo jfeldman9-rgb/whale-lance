@@ -3,9 +3,9 @@
 
   const W = 1280;
   const H = 720;
-  const VERSION = "2.2.0";
-  const SAFE_MS = 1500;
-  const MAX_FOES = 10;
+  const VERSION = "2.3.0";
+  const SAFE_MS = 2600;
+  const MAX_FOES = 8;
   const FOE_SPAWN_X = W - 105;
   const FOE_ENTRY_MS = 900;
   const START_HP = 3;
@@ -26,9 +26,9 @@
   ];
 
   const FOES = {
-    trolloc: { hp: 5, score: 90, scale: 1.03, hit: 0.66, amp: 18 },
-    brute: { hp: 11, score: 190, scale: 1.04, hit: 0.7, amp: 13 },
-    fade: { hp: 8, score: 165, scale: 0.9, hit: 0.43, amp: 38 },
+    trolloc: { hp: 3, score: 80, scale: 1.03, hit: 0.52, amp: 18 },
+    brute: { hp: 7, score: 175, scale: 1.04, hit: 0.56, amp: 13 },
+    fade: { hp: 5, score: 155, scale: 0.9, hit: 0.38, amp: 38 },
   };
 
   const MUSIC_KEYS = Array.from({ length: 9 }, (_v, i) => "music" + String(i).padStart(2, "0"));
@@ -651,6 +651,8 @@
       this.randClearAt = 0;
       this.randFading = false;
       this.shownPowerPrompt = false;
+      this.nextShardAssistAt = 5500;
+      this.nextHeartAssistAt = 0;
       this.showTutorial = !hasLearned();
 
       this.background = this.add.image(W / 2, H / 2, "arena").setDisplaySize(W, H).setDepth(0);
@@ -704,7 +706,7 @@
       this.setupDragInput();
       this.nextAutoFire = this.time.now + 480;
       this.spawnFoe("trolloc", 350);
-      this.nextSpawnAt = this.time.now + 750;
+      this.nextSpawnAt = this.time.now + 1500;
 
       window.TkdRiley = { version: VERSION, play: this };
       this.orientationPaused = false;
@@ -855,73 +857,90 @@
     }
 
     spawnInterval() {
-      return 800 - Math.min(300, (this.runMs / 30000) * 300);
+      if (this.runMs < 10000) return 1500;
+      if (this.runMs < 20000) return 1300;
+      if (this.runMs < 30000) return 1100;
+      if (this.runMs < 45000) return 900;
+      return 750;
     }
 
     itemSpeed() {
-      return -(275 + Math.min(125, (this.runMs / 30000) * 125));
+      if (this.runMs < 10000) return -185;
+      if (this.runMs < 20000) return -215;
+      if (this.runMs < 30000) return -245;
+      if (this.runMs < 45000) return -275;
+      return -305;
+    }
+
+    maxFoes() {
+      if (this.runMs < 10000) return 4;
+      if (this.runMs < 20000) return 5;
+      if (this.runMs < 30000) return 6;
+      if (this.runMs < 45000) return 7;
+      return MAX_FOES;
     }
 
     chooseFoe() {
       const roll = Math.random();
-      if (this.runMs < 4500) return "trolloc";
-      if (this.runMs < 12000) return roll < 0.72 ? "trolloc" : "brute";
-      if (this.runMs < 22000) return roll < 0.52 ? "trolloc" : roll < 0.82 ? "brute" : "fade";
-      return roll < 0.4 ? "trolloc" : roll < 0.7 ? "brute" : "fade";
+      if (this.runMs < 12000) return "trolloc";
+      if (this.runMs < 24000) return roll < 0.8 ? "trolloc" : "brute";
+      if (this.runMs < 36000) return roll < 0.6 ? "trolloc" : roll < 0.85 ? "brute" : "fade";
+      return roll < 0.45 ? "trolloc" : roll < 0.75 ? "brute" : "fade";
     }
 
     nextLaneY() {
-      const lanes = [230, 315, 400, 490, 270, 450];
+      const lanes = [205, 350, 505, 245, 455];
       const base = lanes[this.spawnSerial % lanes.length];
       this.spawnSerial += 1;
-      return Phaser.Math.Clamp(base + Phaser.Math.Between(-22, 22), 185, 530);
+      return Phaser.Math.Clamp(base + Phaser.Math.Between(-14, 14), 185, 525);
     }
 
     spawnWave() {
       if (this.dead || this.cutscene) return;
       const foeCount = this.trollocs.countActive(true) + this.hazards.countActive(true);
-      if (foeCount >= MAX_FOES) return;
-      if (this.runMs < 5000) {
-        this.spawnFoe("trolloc", this.nextLaneY());
+      const foeCap = this.maxFoes();
+      if (this.runMs < 10000) {
+        if (foeCount < foeCap) this.spawnFoe("trolloc", this.nextLaneY());
         return;
       }
 
       const roll = Math.random();
-      if (roll < 0.5) {
-        this.spawnFoe(this.chooseFoe(), this.nextLaneY());
-      } else if (roll < 0.74) {
-        if (foeCount <= MAX_FOES - 2) this.spawnFormation();
-        else this.spawnFoe(this.chooseFoe(), this.nextLaneY());
-      } else if (roll < 0.79) {
+      if (roll < 0.07) {
         this.spawnItem(this.pickups, "shard", this.nextLaneY(), 0.78, 0.95);
         this.maybePowerPrompt();
-      } else if (roll < 0.815) {
-        if (this.hp < MAX_HP) {
-          this.spawnItem(this.pickups, "heart", this.nextLaneY(), 0.78, 0.95);
-          this.maybePowerPrompt();
-        } else {
-          this.spawnFoe(this.chooseFoe(), this.nextLaneY());
-        }
-      } else if (roll < 0.83 && !this.dragonUsed && this.runMs > 25000) {
+        return;
+      }
+      if (roll < 0.13 && this.hp < MAX_HP) {
+        this.spawnItem(this.pickups, "heart", this.nextLaneY(), 0.78, 0.95);
+        this.maybePowerPrompt();
+        return;
+      }
+      if (roll < 0.145 && !this.dragonUsed && this.runMs > 25000) {
         this.spawnItem(this.pickups, "dragon", Phaser.Math.Between(245, 455), 0.84, 1);
-      } else if (roll < 0.9) {
+        return;
+      }
+      if (roll < 0.19 && this.gates.countActive(true) === 0) {
         const gate = this.spawnItem(this.gates, "waygate", this.nextLaneY(), 0.62, 0.5);
-        gate.setData("hp", 7);
-        gate.setData("maxHp", 7);
+        gate.setData("hp", 5);
+        gate.setData("maxHp", 5);
         gate.setData("score", 90);
         gate.setData("kind", "waygate");
         gate.setData("attackable", false);
         gate.setAlpha(0.78).setTint(0x79cfff);
-      } else {
-        this.spawnFoe(this.chooseFoe(), this.nextLaneY());
+        return;
       }
+      if (foeCount >= foeCap) return;
+
+      const formationChance = this.runMs < 18000 ? 0 : this.runMs < 30000 ? 0.12 : 0.2;
+      if (Math.random() < formationChance && foeCount <= foeCap - 2) this.spawnFormation();
+      else this.spawnFoe(this.chooseFoe(), this.nextLaneY());
     }
 
     spawnFormation() {
-      const pair = Math.random() < 0.5 ? [235, 465] : [285, 505];
+      const pair = Math.random() < 0.5 ? [210, 490] : [255, 455];
       this.spawnFoe(this.chooseFoe(), pair[0] + Phaser.Math.Between(-15, 15));
-      this.time.delayedCall(180, () => {
-        if (!this.dead && !this.cutscene && this.trollocs.countActive(true) + this.hazards.countActive(true) < MAX_FOES) {
+      this.time.delayedCall(320, () => {
+        if (!this.dead && !this.cutscene && this.trollocs.countActive(true) + this.hazards.countActive(true) < this.maxFoes()) {
           this.spawnFoe(Math.random() < 0.7 ? "trolloc" : this.chooseFoe(), pair[1] + Phaser.Math.Between(-15, 15));
         }
       });
@@ -942,8 +961,8 @@
       foe.setData("attackable", false);
       foe.setData("entryUntil", this.time.now + FOE_ENTRY_MS);
       foe.setAlpha(1).clearTint();
-      const canShoot = this.runMs > 4500 && (kind === "fade" || kind === "brute");
-      foe.setData("attackAt", canShoot ? this.time.now + Phaser.Math.Between(1050, 1600) : Number.POSITIVE_INFINITY);
+      const canShoot = (kind === "brute" && this.runMs >= 18000) || (kind === "fade" && this.runMs >= 24000);
+      foe.setData("attackAt", canShoot ? this.time.now + Phaser.Math.Between(2200, 3000) : Number.POSITIVE_INFINITY);
       const entryHalo = this.add.ellipse(
         foe.x,
         foe.y,
@@ -1017,7 +1036,7 @@
         targets: ring,
         scale: 2.1,
         alpha: 0,
-        duration: 640,
+        duration: 880,
         ease: "Quad.out",
         onComplete: () => {
           if (ring.active) ring.destroy();
@@ -1025,7 +1044,7 @@
           if (foe.active && !this.dead && !this.cutscene) this.launchEnemyShot(foe);
           if (foe.active) {
             foe.setData("telegraphing", false);
-            foe.setData("attackAt", this.time.now + Phaser.Math.Between(1800, 2700));
+            foe.setData("attackAt", this.time.now + Phaser.Math.Between(3400, 4600));
           }
         },
       });
@@ -1041,7 +1060,8 @@
       orb.setData("kind", "enemyShot");
       orb.body.setCircle(Math.min(orb.width, orb.height) * 0.24);
       const angle = Math.atan2(this.riley.y - foe.y, this.riley.x - foe.x);
-      const speed = 290 + Math.min(90, this.runMs / 333);
+      const rangedRamp = Math.max(0, this.runMs - 18000) / 600;
+      const speed = 225 + Math.min(70, rangedRamp);
       this.physics.velocityFromRotation(angle, speed, orb.body.velocity);
       const glow = this.add.circle(orb.x, orb.y, 25, fadeShot ? 0x8d5cff : 0xff4c35, 0.22).setDepth(11);
       orb.setData("glow", glow);
@@ -1166,7 +1186,17 @@
         item.destroy();
       }
       this.hp -= 1;
-      this.invuln = 750;
+      this.invuln = 1400;
+      if (this.hp > 0 && this.time.now >= this.nextHeartAssistAt) {
+        this.nextHeartAssistAt = this.time.now + 12000;
+        const heartY = this.riley.y;
+        this.time.delayedCall(650, () => {
+          if (!this.dead && this.hp < MAX_HP && this.pickups.countActive(true) < 3) {
+            this.spawnItem(this.pickups, "heart", heartY, 0.82, 1, W - 360);
+            this.flashWarn("HEART INCOMING", 1200);
+          }
+        });
+      }
       this.cameras.main.flash(150, 255, 95, 70);
       this.cameras.main.shake(130, 0.008);
       this.floatLabel(this.riley.x, this.riley.y - 78, "HIT");
@@ -1495,8 +1525,8 @@
       this.riley.setScale(0.27);
       this.riley.setFlipX(false);
       this.riley.setAngle(0);
-      const bodyWidth = 270;
-      const bodyHeight = 590;
+      const bodyWidth = 240;
+      const bodyHeight = 470;
       this.riley.body.setSize(bodyWidth, bodyHeight);
       this.riley.body.setOffset((this.riley.width - bodyWidth) / 2, (this.riley.height - bodyHeight) / 2 + 36);
     }
@@ -1526,6 +1556,13 @@
       this.invuln = Math.max(0, this.invuln - dt);
       if (this.time.now >= this.castUntil) this.casting = false;
       if (this.cutscene) return;
+
+      if (this.weaponLevel < 3 && this.runMs >= this.nextShardAssistAt && this.pickups.countActive(true) < 3) {
+        const shardY = Phaser.Math.Clamp(this.riley.y + Phaser.Math.Between(-35, 35), 180, 530);
+        this.spawnItem(this.pickups, "shard", shardY, 0.8, 1, W - 220);
+        this.nextShardAssistAt += 5500;
+        this.maybePowerPrompt();
+      }
 
       if (this.time.now >= this.nextAutoFire) this.autoFire();
       if (this.time.now >= this.nextSpawnAt) {
