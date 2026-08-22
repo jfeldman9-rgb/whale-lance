@@ -3,9 +3,9 @@
 
   const W = 1280;
   const H = 720;
-  const VERSION = "2.0.0";
-  const SAFE_MS = 3000;
-  const MAX_FOES = 7;
+  const VERSION = "2.1.0";
+  const SAFE_MS = 1500;
+  const MAX_FOES = 10;
   const START_HP = 3;
   const MAX_HP = 3;
   const PLAYER_BOUNDS = { minX: 125, maxX: 545, minY: 150, maxY: 565 };
@@ -18,15 +18,15 @@
 
   const WEAPONS = [
     null,
-    { name: "FIREBALL", key: "fireball", damage: 1, speed: 680, pierce: 0, scale: 0.55, color: 0xff8a36, cadence: 280 },
-    { name: "LIGHTNING", key: "bolt", damage: 2, speed: 820, pierce: 1, scale: 0.58, color: 0x7ed9ff, cadence: 240 },
-    { name: "BALEFIRE", key: "balefire", damage: 4, speed: 760, pierce: 3, scale: 0.68, color: 0xffed9e, cadence: 205 },
+    { name: "FIREBALL", key: "fireball", damage: 1, speed: 640, pierce: 0, scale: 0.5, color: 0xff8a36, cadence: 330 },
+    { name: "LIGHTNING", key: "bolt", damage: 2, speed: 800, pierce: 1, scale: 0.56, color: 0x7ed9ff, cadence: 285 },
+    { name: "BALEFIRE", key: "balefire", damage: 4, speed: 740, pierce: 3, scale: 0.66, color: 0xffed9e, cadence: 245 },
   ];
 
   const FOES = {
-    trolloc: { hp: 2, score: 55, scale: 0.78, hit: 0.69, amp: 15 },
-    brute: { hp: 6, score: 135, scale: 0.84, hit: 0.72, amp: 10 },
-    fade: { hp: 4, score: 110, scale: 0.72, hit: 0.45, amp: 32 },
+    trolloc: { hp: 3, score: 70, scale: 0.86, hit: 0.66, amp: 18 },
+    brute: { hp: 8, score: 165, scale: 0.92, hit: 0.7, amp: 13 },
+    fade: { hp: 6, score: 145, scale: 0.8, hit: 0.43, amp: 38 },
   };
 
   const MUSIC_KEYS = Array.from({ length: 9 }, (_v, i) => "music" + String(i).padStart(2, "0"));
@@ -640,6 +640,7 @@
       this.nextSpawnAt = 0;
       this.spawnSerial = 0;
       this.firstKillVoice = false;
+      this.firstFoeSpawned = false;
       this.fadeVoice = false;
       this.lowVoice = false;
       this.dragVoice = false;
@@ -700,7 +701,7 @@
       this.createDragTutorial();
       this.setupDragInput();
       this.nextAutoFire = this.time.now + 480;
-      this.nextSpawnAt = this.time.now + 700;
+      this.nextSpawnAt = this.time.now + 350;
 
       window.TkdRiley = { version: VERSION, play: this };
       this.orientationPaused = false;
@@ -851,18 +852,19 @@
     }
 
     spawnInterval() {
-      return 1050 - Math.min(330, (this.runMs / 60000) * 330);
+      return 800 - Math.min(300, (this.runMs / 30000) * 300);
     }
 
     itemSpeed() {
-      return -(230 + Math.min(115, (this.runMs / 60000) * 115));
+      return -(275 + Math.min(125, (this.runMs / 30000) * 125));
     }
 
     chooseFoe() {
       const roll = Math.random();
-      if (this.runMs < 11000) return "trolloc";
-      if (this.runMs < 26000) return roll < 0.72 ? "trolloc" : roll < 0.9 ? "brute" : "fade";
-      return roll < 0.52 ? "trolloc" : roll < 0.78 ? "brute" : "fade";
+      if (this.runMs < 4500) return "trolloc";
+      if (this.runMs < 12000) return roll < 0.72 ? "trolloc" : "brute";
+      if (this.runMs < 22000) return roll < 0.52 ? "trolloc" : roll < 0.82 ? "brute" : "fade";
+      return roll < 0.4 ? "trolloc" : roll < 0.7 ? "brute" : "fade";
     }
 
     nextLaneY() {
@@ -876,34 +878,37 @@
       if (this.dead || this.cutscene) return;
       const foeCount = this.trollocs.countActive(true) + this.hazards.countActive(true);
       if (foeCount >= MAX_FOES) return;
-      if (this.runMs < SAFE_MS) {
+      if (this.runMs < 5000) {
         this.spawnFoe("trolloc", this.nextLaneY());
         return;
       }
 
       const roll = Math.random();
-      if (roll < 0.58) {
+      if (roll < 0.5) {
         this.spawnFoe(this.chooseFoe(), this.nextLaneY());
-      } else if (roll < 0.68 && foeCount <= MAX_FOES - 2 && this.runMs > 9000) {
-        this.spawnFormation();
-      } else if (roll < 0.75) {
+      } else if (roll < 0.74) {
+        if (foeCount <= MAX_FOES - 2) this.spawnFormation();
+        else this.spawnFoe(this.chooseFoe(), this.nextLaneY());
+      } else if (roll < 0.79) {
         this.spawnItem(this.pickups, "shard", this.nextLaneY(), 0.78, 0.95);
         this.maybePowerPrompt();
-      } else if (roll < 0.80) {
+      } else if (roll < 0.815) {
         if (this.hp < MAX_HP) {
           this.spawnItem(this.pickups, "heart", this.nextLaneY(), 0.78, 0.95);
           this.maybePowerPrompt();
         } else {
           this.spawnFoe(this.chooseFoe(), this.nextLaneY());
         }
-      } else if (roll < 0.825 && !this.dragonUsed && this.runMs > 30000) {
+      } else if (roll < 0.83 && !this.dragonUsed && this.runMs > 25000) {
         this.spawnItem(this.pickups, "dragon", Phaser.Math.Between(245, 455), 0.84, 1);
-      } else if (roll < 0.90) {
+      } else if (roll < 0.9) {
         const gate = this.spawnItem(this.gates, "waygate", this.nextLaneY(), 0.62, 0.5);
-        gate.setData("hp", 5);
-        gate.setData("maxHp", 5);
+        gate.setData("hp", 7);
+        gate.setData("maxHp", 7);
         gate.setData("score", 90);
         gate.setData("kind", "waygate");
+        gate.setData("attackable", false);
+        gate.setAlpha(0.78).setTint(0x79cfff);
       } else {
         this.spawnFoe(this.chooseFoe(), this.nextLaneY());
       }
@@ -931,8 +936,10 @@
       foe.setData("phase", Phaser.Math.FloatBetween(0, Math.PI * 2));
       foe.setData("amp", spec.amp + Math.min(18, this.runMs / 4000));
       foe.setData("telegraphing", false);
-      const canShoot = this.runMs > 8000 && (kind === "fade" || kind === "brute");
-      foe.setData("attackAt", canShoot ? this.time.now + Phaser.Math.Between(900, 1650) : Number.POSITIVE_INFINITY);
+      foe.setData("attackable", false);
+      foe.setAlpha(0.78).setTint(0x79cfff);
+      const canShoot = this.runMs > 4500 && (kind === "fade" || kind === "brute");
+      foe.setData("attackAt", canShoot ? this.time.now + Phaser.Math.Between(1050, 1600) : Number.POSITIVE_INFINITY);
       const shadow = this.add.ellipse(foe.x, foe.y + foe.displayHeight * 0.36, foe.displayWidth * 0.62, 22, 0x000000, 0.38).setDepth(7);
       foe.setData("shadow", shadow);
       const barBack = this.add.rectangle(foe.x, foe.y - 75, 72, 9, 0x14080a, 0.9).setDepth(14).setVisible(false);
@@ -942,11 +949,15 @@
       if (kind === "fade" && !this.fadeVoice) {
         if (AudioDirector.speak(this, "vFade", 2)) this.fadeVoice = true;
       }
+      if (!this.firstFoeSpawned) {
+        this.firstFoeSpawned = true;
+        this.flashWarn("SHADOWSPAWN INCOMING", 1300);
+      }
       return foe;
     }
 
     spawnItem(group, key, y, scale, hit = 1) {
-      const item = group.create(W + 120, y, key);
+      const item = group.create(W + 60, y, key);
       item.setScale(scale);
       item.body.allowGravity = false;
       item.setVelocityX(this.itemSpeed());
@@ -975,7 +986,7 @@
         targets: ring,
         scale: 2.1,
         alpha: 0,
-        duration: 560,
+        duration: 640,
         ease: "Quad.out",
         onComplete: () => {
           if (ring.active) ring.destroy();
@@ -983,7 +994,7 @@
           if (foe.active && !this.dead && !this.cutscene) this.launchEnemyShot(foe);
           if (foe.active) {
             foe.setData("telegraphing", false);
-            foe.setData("attackAt", this.time.now + Phaser.Math.Between(2300, 3700));
+            foe.setData("attackAt", this.time.now + Phaser.Math.Between(1800, 2700));
           }
         },
       });
@@ -999,7 +1010,7 @@
       orb.setData("kind", "enemyShot");
       orb.body.setCircle(Math.min(orb.width, orb.height) * 0.24);
       const angle = Math.atan2(this.riley.y - foe.y, this.riley.x - foe.x);
-      const speed = 255 + Math.min(85, this.runMs / 800);
+      const speed = 290 + Math.min(90, this.runMs / 333);
       this.physics.velocityFromRotation(angle, speed, orb.body.velocity);
       const glow = this.add.circle(orb.x, orb.y, 25, fadeShot ? 0x8d5cff : 0xff4c35, 0.22).setDepth(11);
       orb.setData("glow", glow);
@@ -1011,6 +1022,12 @@
       const shot = this.shotsGroup.create(this.riley.x + 73, this.riley.y - 8, spec.key);
       shot.setScale(spec.scale);
       shot.body.allowGravity = false;
+      const shotRadius = Math.min(shot.width, shot.height) * 0.22;
+      shot.body.setCircle(
+        shotRadius,
+        (shot.width - shotRadius * 2) / 2,
+        (shot.height - shotRadius * 2) / 2,
+      );
       shot.setVelocityX(spec.speed);
       shot.setDepth(13);
       shot.setData("damage", spec.damage);
@@ -1045,6 +1062,7 @@
 
     onShotHit(shot, foe) {
       if (!shot.active || !foe.active) return;
+      if (foe.getData("attackable") === false || foe.x > W - 80) return;
       const hitFoes = shot.getData("hitFoes");
       if (hitFoes && hitFoes.has(foe)) return;
       if (hitFoes) hitFoes.add(foe);
@@ -1117,7 +1135,7 @@
         item.destroy();
       }
       this.hp -= 1;
-      this.invuln = 850;
+      this.invuln = 750;
       this.cameras.main.flash(150, 255, 95, 70);
       this.cameras.main.shake(130, 0.008);
       this.floatLabel(this.riley.x, this.riley.y - 78, "HIT");
@@ -1288,6 +1306,15 @@
           foe.y = Phaser.Math.Clamp(baseY + Math.sin(this.runMs / 520 + phase) * amplitude, 175, 545);
           if (foe.body) foe.body.updateFromGameObject();
           foe.setVelocityX(this.itemSpeed());
+          if (foe.getData("attackable") === false && foe.x <= W - 80) {
+            foe.setData("attackable", true);
+            foe.setAlpha(1).clearTint();
+            const entryBar = foe.getData("hpBar");
+            const entryBarBack = foe.getData("hpBarBack");
+            if (entryBar) entryBar.setVisible(true);
+            if (entryBarBack) entryBarBack.setVisible(true);
+            this.impactBurst(foe.x, foe.y, 0x76d7ff, 5);
+          }
           const shadow = foe.getData("shadow");
           if (shadow && shadow.active) {
             shadow.x = foe.x;
@@ -1311,7 +1338,9 @@
             telegraphRing.x = foe.x;
             telegraphRing.y = foe.y;
           }
-          if (this.time.now >= (foe.getData("attackAt") || Number.POSITIVE_INFINITY)) this.telegraphFoe(foe);
+          if (foe.getData("attackable") && this.time.now >= (foe.getData("attackAt") || Number.POSITIVE_INFINITY)) {
+            this.telegraphFoe(foe);
+          }
         });
       };
       syncFoes(this.trollocs);
@@ -1319,7 +1348,13 @@
 
       [this.pickups, this.gates].forEach((group) => {
         group.children.iterate((item) => {
-          if (item && item.active) item.setVelocityX(this.itemSpeed());
+          if (!item || !item.active) return;
+          item.setVelocityX(this.itemSpeed());
+          if (group === this.gates && item.getData("attackable") === false && item.x <= W - 80) {
+            item.setData("attackable", true);
+            item.setAlpha(1).clearTint();
+            this.impactBurst(item.x, item.y, 0x76d7ff, 5);
+          }
         });
       });
 
@@ -1448,8 +1483,15 @@
 
       if (this.time.now >= this.nextAutoFire) this.autoFire();
       if (this.time.now >= this.nextSpawnAt) {
-        this.spawnWave();
-        this.nextSpawnAt = this.time.now + this.spawnInterval();
+        let catchUpWaves = 0;
+        while (this.time.now >= this.nextSpawnAt && catchUpWaves < 2) {
+          this.spawnWave();
+          this.nextSpawnAt += this.spawnInterval();
+          catchUpWaves += 1;
+        }
+        if (this.time.now - this.nextSpawnAt > this.spawnInterval() * 2) {
+          this.nextSpawnAt = this.time.now + this.spawnInterval();
+        }
       }
 
       this.score += dt * 0.006;
@@ -1474,7 +1516,7 @@
       this.sweepGroup(this.hazards);
       this.sweepGroup(this.pickups);
       this.sweepGroup(this.gates);
-      this.sweepGroup(this.shotsGroup, -120, W + 180);
+      this.sweepGroup(this.shotsGroup, -120, W - 24);
       this.sweepGroup(this.enemyShots, -160, W + 180);
       this.scoreText.setText("SCORE " + Math.floor(this.score));
       this.refreshHUD();
